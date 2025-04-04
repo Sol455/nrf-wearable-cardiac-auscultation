@@ -20,14 +20,31 @@
 
 / {
     aliases {
-        led0 = &board_led0; 
+        led0 = &board_led0;
+        sw0  = &board_button0;
+        sw1  = &board_button1; 
     };
 
     leds {
         compatible = "gpio-leds";
+
         board_led0: led_0 {
             gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
-            label = "LED0 override";
+            label = "LED0";
+        };
+    };
+
+    buttons {
+        compatible = "gpio-keys";
+
+        board_button0: button_0 {
+            gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+            label = "Button 0";
+        };
+
+        board_button1: button_1 {
+            gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+            label = "Button 1";
         };
     };
 };
