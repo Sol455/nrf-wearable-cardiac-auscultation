@@ -1,6 +1,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
+#include "modules/sd_card.h"
 
 #define LED0_NODE DT_ALIAS(led0)
 #define SW0_NODE DT_ALIAS(sw0)

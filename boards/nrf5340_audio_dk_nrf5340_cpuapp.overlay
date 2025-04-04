@@ -1,25 +1,4 @@
-// &clock {
-// 	hfclkaudio-frequency = <12288000>;
-// };
-
-// &pinctrl {
-// 	pdm0_default_alt: pdm0_default_alt {
-// 		group1 {
-// 			psels = <NRF_PSEL(PDM_CLK, 1, 12)>,
-// 				<NRF_PSEL(PDM_DIN, 1, 13)>;
-// 		};
-// 	};
-// };
-
-// dmic_dev: &pdm0 {
-// 	status = "okay";
-// 	pinctrl-0 = <&pdm0_default_alt>;
-// 	pinctrl-names = "default";
-// 	clock-source = "ACLK";
-// };
-
 / {
-	
     aliases {
         led0 = &board_led0;
         sw0  = &board_button0;
@@ -48,5 +27,51 @@
             label = "Button 1";
         };
     };
+};
 
+&pinctrl {
+    spi4_default: spi4_default {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 0, 8)>,
+                    <NRF_PSEL(SPIM_MOSI, 0, 9)>;
+            nordic,drive-mode = <NRF_DRIVE_H0H1>;
+        };
+        group2 {
+            psels = <NRF_PSEL(SPIM_MISO, 0, 10)>;
+        };
+    };
+
+    spi4_sleep: spi4_sleep {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 0, 8)>,
+                    <NRF_PSEL(SPIM_MISO, 0, 10)>,
+                    <NRF_PSEL(SPIM_MOSI, 0, 9)>;
+            low-power-enable;
+        };
+    };
+};
+
+&spi4 {
+    compatible = "nordic,nrf-spim";
+    status = "okay";
+
+    pinctrl-0 = <&spi4_default>;
+    pinctrl-1 = <&spi4_sleep>;
+    pinctrl-names = "default", "sleep";
+
+    cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>; // CS = P0.15
+
+    #address-cells = <1>;
+    #size-cells = <0>;
+    board_sdhc: sdhc@0 {
+        compatible = "zephyr,sdhc-spi-slot";
+        reg = <0>;
+        status = "okay";
+        spi-max-frequency = <8000000>;
+
+        sdmmc {
+            compatible = "zephyr,sdmmc-disk";
+            status = "okay";
+        };
+    };
 };
