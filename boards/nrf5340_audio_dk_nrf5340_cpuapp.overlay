@@ -19,6 +19,7 @@
 // };
 
 / {
+	
     aliases {
         led0 = &board_led0;
         sw0  = &board_button0;
@@ -47,4 +48,5 @@
             label = "Button 1";
         };
     };
+
 };
