@@ -1,19 +1,33 @@
-&clock {
-	hfclkaudio-frequency = <12288000>;
-};
+// &clock {
+// 	hfclkaudio-frequency = <12288000>;
+// };
 
-&pinctrl {
-	pdm0_default_alt: pdm0_default_alt {
-		group1 {
-			psels = <NRF_PSEL(PDM_CLK, 1, 12)>,
-				<NRF_PSEL(PDM_DIN, 1, 13)>;
-		};
-	};
-};
+// &pinctrl {
+// 	pdm0_default_alt: pdm0_default_alt {
+// 		group1 {
+// 			psels = <NRF_PSEL(PDM_CLK, 1, 12)>,
+// 				<NRF_PSEL(PDM_DIN, 1, 13)>;
+// 		};
+// 	};
+// };
 
-dmic_dev: &pdm0 {
-	status = "okay";
-	pinctrl-0 = <&pdm0_default_alt>;
-	pinctrl-names = "default";
-	clock-source = "ACLK";
+// dmic_dev: &pdm0 {
+// 	status = "okay";
+// 	pinctrl-0 = <&pdm0_default_alt>;
+// 	pinctrl-names = "default";
+// 	clock-source = "ACLK";
+// };
+
+/ {
+    aliases {
+        led0 = &board_led0; 
+    };
+
+    leds {
+        compatible = "gpio-leds";
+        board_led0: led_0 {
+            gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+            label = "LED0 override";
+        };
+    };
 };
