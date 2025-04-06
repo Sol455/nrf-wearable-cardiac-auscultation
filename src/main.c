@@ -30,6 +30,8 @@ int main(void)
 {
     int ret;
 
+    LOG_INF("Turning on");
+
     ret = device_is_ready(led0.port);
     ret = device_is_ready(sw0.port);
     ret = device_is_ready(sw1.port);
@@ -53,9 +55,25 @@ int main(void)
 
     LOG_INF("Configured Buttons & Interrupts");
 
+    ret = sd_card_init();
+	if(ret!=0) {
+		LOG_ERR("SD Failed to init");
+	}
+
+    size_t buffer_size = 1024;
+ 
+ 	char *buffer[buffer_size];   //Buffer to store file list
+ 	ret = sd_card_list_files(NULL, buffer, &buffer_size);
+
+    if(ret!=0) {
+		LOG_ERR("SD Failed to list files");
+	}
+
+    LOG_INF("Sucessfully initialised peripherals");
+
     while (1) {
         k_msleep(200);
-        LOG_INF("Hello");
+
     }
 }
 

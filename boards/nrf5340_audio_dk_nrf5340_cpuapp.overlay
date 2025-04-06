@@ -3,6 +3,7 @@
         led0 = &board_led0;
         sw0  = &board_button0;
         sw1  = &board_button1; 
+        spi-sd = &spi2;
     };
 
     leds {
@@ -29,49 +30,34 @@
     };
 };
 
-&pinctrl {
-    spi4_default: spi4_default {
-        group1 {
-            psels = <NRF_PSEL(SPIM_SCK, 0, 8)>,
-                    <NRF_PSEL(SPIM_MOSI, 0, 9)>;
-            nordic,drive-mode = <NRF_DRIVE_H0H1>;
-        };
-        group2 {
-            psels = <NRF_PSEL(SPIM_MISO, 0, 10)>;
-        };
-    };
-
-    spi4_sleep: spi4_sleep {
-        group1 {
-            psels = <NRF_PSEL(SPIM_SCK, 0, 8)>,
-                    <NRF_PSEL(SPIM_MISO, 0, 10)>,
-                    <NRF_PSEL(SPIM_MOSI, 0, 9)>;
-            low-power-enable;
-        };
-    };
-};
-
-&spi4 {
+&spi2 {
     compatible = "nordic,nrf-spim";
     status = "okay";
+    pinctrl-0 = <&spi2_sd_pins>;
+    pinctrl-names = "default";
+    cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;  // CS index 0
 
-    pinctrl-0 = <&spi4_default>;
-    pinctrl-1 = <&spi4_sleep>;
-    pinctrl-names = "default", "sleep";
-
-    cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>; // CS = P0.15
-
-    #address-cells = <1>;
-    #size-cells = <0>;
-    board_sdhc: sdhc@0 {
+    board_sdhc0: sdhc@0 {
         compatible = "zephyr,sdhc-spi-slot";
         reg = <0>;
         status = "okay";
-        spi-max-frequency = <8000000>;
 
         sdmmc {
             compatible = "zephyr,sdmmc-disk";
             status = "okay";
+            label = "SD";  
+        };
+
+        spi-max-frequency = <8000000>;
+    };
+};
+
+&pinctrl {
+    spi2_sd_pins: spi2_sd_pins {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 0, 8)>,
+                    <NRF_PSEL(SPIM_MOSI, 0, 9)>,
+                    <NRF_PSEL(SPIM_MISO, 0, 10)>;
         };
     };
 };
