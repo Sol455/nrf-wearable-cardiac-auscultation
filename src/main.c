@@ -18,22 +18,22 @@ static struct gpio_callback sw1_cb;
 
 LOG_MODULE_REGISTER(main);
 
-//MEM Slab for I2s Audio Driver
+//Mek slab for I2s Audio Driver
 #define MAX_SAMPLE_RATE  16000
-#define SAMPLE_BIT_WIDTH 16
-#define BYTES_PER_SAMPLE sizeof(int16_t)
+#define SAMPLE_BIT_WIDTH 24
+#define BYTES_PER_SAMPLE 3
 #define READ_TIMEOUT     1000
 
 #define BLOCK_SIZE(_sample_rate, _number_of_channels) \
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
 
-#define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 1)
+#define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 2)
 #define BLOCK_COUNT 10
 #define WAV_LENGTH_BLOCKS 100
 
 K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 32); //align to 32 bytes in memory
 
-void *mem_blocks[BLOCK_COUNT];  // Array to store pointers to each block
+void *mem_blocks[BLOCK_COUNT];  // Array to store pointers to each block for initial SD tests
 
 void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
@@ -45,12 +45,30 @@ void sw1_callback(const struct device *dev, struct gpio_callback *cb, uint32_t p
     gpio_pin_toggle_dt(&led0);
 }
 
+int config_i2s_stream(const struct device *i2s_dev) {
+    struct i2s_config i2s_cfg;
+	i2s_cfg.word_size = SAMPLE_BIT_WIDTH; 
+	i2s_cfg.channels = 2; //Mono
+	i2s_cfg.format = I2S_FMT_DATA_FORMAT_LEFT_JUSTIFIED;
+	i2s_cfg.options = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER;
+	i2s_cfg.frame_clk_freq = MAX_SAMPLE_RATE;
+	i2s_cfg.mem_slab = &mem_slab;
+	i2s_cfg.block_size = MAX_BLOCK_SIZE;
+	i2s_cfg.timeout = READ_TIMEOUT;
+
+    int ret = i2s_configure(i2s_dev, I2S_DIR_RX, &i2s_cfg);
+	if (ret < 0) {
+		LOG_WRN("Failed to configure the I2S stream: (%d)\n", ret);
+        return -1;
+    }
+    return 0;
+}
+
 int main(void)
 {
     int ret;
 
     LOG_INF("Turning on");
-
     ret = device_is_ready(led0.port);
     ret = device_is_ready(sw0.port);
     ret = device_is_ready(sw1.port);
@@ -71,26 +89,6 @@ int main(void)
 
     LOG_INF("Configured Buttons & Interrupts");
 
-    const struct device *i2s_dev = DEVICE_DT_GET(DT_NODELABEL(i2s0));
-	if (!device_is_ready(i2s_dev)) {
-	    LOG_WRN("%s is not ready\n", i2s_dev->name);
-	}
-
-    struct i2s_config i2s_cfg;
-	i2s_cfg.word_size = SAMPLE_BIT_WIDTH; 
-	i2s_cfg.channels = 1; //Mono
-	i2s_cfg.format = I2S_FMT_DATA_FORMAT_I2S;
-	i2s_cfg.options = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER;
-	i2s_cfg.frame_clk_freq = MAX_SAMPLE_RATE;
-	i2s_cfg.mem_slab = &mem_slab;
-	i2s_cfg.block_size = MAX_BLOCK_SIZE;
-	i2s_cfg.timeout = READ_TIMEOUT;
-
-	ret = i2s_configure(i2s_dev, I2S_DIR_RX, &i2s_cfg);
-	if (ret < 0) {
-		LOG_WRN("Failed to configure the I2S stream: (%d)\n", ret);
-    }
-
     ret = sd_card_init();
 	if(ret!=0) {
 		LOG_ERR("SD Failed to init");
@@ -98,12 +96,20 @@ int main(void)
 
     size_t buffer_size = 1024;
  	char buffer[buffer_size];   //Buffer to store file list
- 	ret = sd_card_list_files(NULL, buffer, &buffer_size);
-    if(ret!=0) {
-		LOG_ERR("SD Failed to list files");
+ 	// ret = sd_card_list_files(NULL, buffer, &buffer_size);
+    // if(ret!=0) {
+	// 	LOG_ERR("SD Failed to list files");
+	// } else {
+    //     LOG_INF("Configured SD Card sucessfully");
+
+    // }
+
+    const struct device *i2s_dev = DEVICE_DT_GET(DT_NODELABEL(i2s0));
+	if (!device_is_ready(i2s_dev)) {
+	    LOG_WRN("%s is not ready\n", i2s_dev->name);
 	}
 
-    LOG_INF("Sucessfully initialised peripherals");
+    config_i2s_stream(i2s_dev);
 
     void *buffer_pointer;
     size_t bytes_read = 0;
@@ -113,23 +119,34 @@ int main(void)
         LOG_WRN("Failed to start the transmission: %d\n", ret);
     }
 
-    for(int i = 0; i < 8; i ++) {
+    k_msleep(100); 
+
+    for(int i = 0; i < 200; i ++) {
+
+       // memset(buffer_pointer, 0, MAX_BLOCK_SIZE);
+
         ret = i2s_read(i2s_dev, &buffer_pointer, &bytes_read);
         if (ret == 0) {
-            LOG_INF("Successfully read %d bytes", bytes_read);
+            //LOG_INF("Successfully read %d bytes", bytes_read);
         } else {
             LOG_ERR("Failed to read I2S data: %d", ret);
         }
 
-        LOG_HEXDUMP_INF(buffer_pointer, bytes_read, "Block data");
 
-        k_mem_slab_free(&mem_slab, buffer_pointer);
+        // if (i > 100) {
+        //     LOG_INF("First byte: 0x%02x", ((uint8_t*)buffer_pointer)[0]);
+        //     LOG_INF("Second byte: 0x%02x", ((uint8_t*)buffer_pointer)[1]);
+        //     LOG_INF("Third byte: 0x%02x", ((uint8_t*)buffer_pointer)[2]);
+        //     LOG_INF("Fourth byte: 0x%02x", ((uint8_t*)buffer_pointer)[3]);
+        // }
+        memset(buffer_pointer, 0, MAX_BLOCK_SIZE);
+        k_mem_slab_free(&mem_slab, &buffer_pointer);
 
     }
-
+    //Dump the contents of the final buffer
+    LOG_HEXDUMP_INF(buffer_pointer, MAX_BLOCK_SIZE, "AUDIO DATA p");
     while (1) {
         k_msleep(200);
-
     }
 }
 

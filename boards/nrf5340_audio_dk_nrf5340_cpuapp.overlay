@@ -90,7 +90,10 @@
 
 };
 
+// &clock {
+//     hfclkaudio-frequency = <8192000>;  // 8.192 MHz for 256x ratio
+// };
 &clock {
-    hfclkaudio-frequency = <8192000>;  // 8.192 MHz for 256x ratio
+	hfclkaudio-frequency = <11289600>;
 };
 
