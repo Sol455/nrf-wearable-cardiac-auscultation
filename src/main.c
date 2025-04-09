@@ -27,12 +27,11 @@ LOG_MODULE_REGISTER(main);
 #define BLOCK_SIZE(_sample_rate, _number_of_channels) \
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
 
-#define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 2)
+#define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 1)
 #define BLOCK_COUNT 10
 #define WAV_LENGTH_BLOCKS 100
 
 K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 32); //align to 32 bytes in memory
-
 void *mem_blocks[BLOCK_COUNT];  // Array to store pointers to each block for initial SD tests
 
 void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
@@ -48,7 +47,7 @@ void sw1_callback(const struct device *dev, struct gpio_callback *cb, uint32_t p
 int config_i2s_stream(const struct device *i2s_dev) {
     struct i2s_config i2s_cfg;
 	i2s_cfg.word_size = SAMPLE_BIT_WIDTH; 
-	i2s_cfg.channels = 2; //Mono
+	i2s_cfg.channels = 1; //Mono
 	i2s_cfg.format = I2S_FMT_DATA_FORMAT_LEFT_JUSTIFIED;
 	i2s_cfg.options = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER;
 	i2s_cfg.frame_clk_freq = MAX_SAMPLE_RATE;
