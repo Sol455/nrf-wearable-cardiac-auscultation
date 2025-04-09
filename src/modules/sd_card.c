@@ -294,14 +294,14 @@ int sd_card_open_for_write(char const *const filename, struct fs_file_t *f_seg_w
 		LOG_ERR("Sem take failed. Ret: %d", ret);
 		return ret;
 	}
-		LOG_ERR("1!");
+		//LOG_ERR("1!");
 
 
 	if (!sd_init_success) {
 		k_sem_give(&m_sem_sd_oper_ongoing);
 		return -ENODEV;
 	}
-		LOG_ERR("2!");
+		//LOG_ERR("2!");
 
 
 	if (strlen(filename) > FS_FATFS_MAX_LFN) {
@@ -310,7 +310,7 @@ int sd_card_open_for_write(char const *const filename, struct fs_file_t *f_seg_w
 		return -ENAMETOOLONG;
 	}
 
-	LOG_ERR("3!");
+	//LOG_ERR("3!");
 
 
 	if ((strlen(abs_path_name) + strlen(filename)) > PATH_MAX_LEN) {
@@ -327,7 +327,7 @@ int sd_card_open_for_write(char const *const filename, struct fs_file_t *f_seg_w
 
 	fs_unlink(abs_path_name);
 
-	LOG_ERR("GOT HERE!");
+	//LOG_ERR("GOT HERE!");
 
 
 	ret = fs_open(f_seg_write_entry, abs_path_name, FS_O_WRITE | FS_O_CREATE | FS_O_APPEND);

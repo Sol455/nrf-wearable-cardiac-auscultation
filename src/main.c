@@ -28,11 +28,13 @@ LOG_MODULE_REGISTER(main);
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
 
 #define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 1)
-#define BLOCK_COUNT 10
+#define BLOCK_COUNT 25
 #define WAV_LENGTH_BLOCKS 100
 
 K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 32); //align to 32 bytes in memory
-void *mem_blocks[BLOCK_COUNT];  // Array to store pointers to each block for initial SD tests
+
+void *audio_buffers[BLOCK_COUNT];  // Array to store pointers to each block for initial SD tests
+size_t buffer_sizes[BLOCK_COUNT];
 
 void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
@@ -61,6 +63,69 @@ int config_i2s_stream(const struct device *i2s_dev) {
         return -1;
     }
     return 0;
+}
+
+static struct fs_file_t wav_file;
+int slab_counter = 0;
+
+void write_wav() {
+
+	fs_file_t_init(&wav_file);
+
+	int ret = sd_card_open_for_write("poortaa.wav", &wav_file);
+		if (ret!= 0) {
+			LOG_ERR("Failed to open file, rc=%d", ret);
+			//return err;	
+			} else {
+			LOG_INF("Opened SD card sucessfully");
+
+			ret = write_wav_header(
+				&wav_file,
+				slab_counter * MAX_BLOCK_SIZE,
+				//16000, // hard coded header because fs_seek doesn't seem to be working.
+				MAX_SAMPLE_RATE, // bugbug: somehow the lc3 decoded data is
+				// returning twice as much data as expected...?
+				3,// bit depth octests
+				1 // 1 channel
+			);
+		}
+
+		if(ret!=0) {
+			LOG_ERR("Failed to write wav header");
+			return 0;
+		}
+
+		//pointer to buffer, data_size...
+		//for block in blocks.....
+		for(int i =0; i < slab_counter; i++) {
+			//LOG_HEXDUMP_INF((uint8_t *)audio_buffers[i], buffer_sizes[i], "Received audio data:");		
+			int ret = write_wav_data(&wav_file, audio_buffers[i], buffer_sizes[i]);
+
+			k_mem_slab_free(&mem_slab, &audio_buffers[i]);
+
+		if (ret != 0) {
+			LOG_ERR("Failed to write to file, rc=%d", ret);
+			return;
+		}
+		}
+		ret = sd_card_close(&wav_file);
+        if (ret != 0) {
+			LOG_ERR("Failed to close SD card");
+			return;
+		} else {
+            LOG_INF("CLOSED SD CARD");
+        }
+
+        // size_t buffer_size = 1024;
+ 	    // char buffer[buffer_size];   //Buffer to store file list
+ 	    // ret = sd_card_list_files(NULL, buffer, &buffer_size);
+        // if(ret!=0) {
+	    // 	LOG_ERR("SD Failed to list files");
+	    // } else {
+        //     LOG_INF("Configured SD Card sucessfully");
+        // }
+
+
 }
 
 int main(void)
@@ -93,15 +158,6 @@ int main(void)
 		LOG_ERR("SD Failed to init");
 	}
 
-    size_t buffer_size = 1024;
- 	char buffer[buffer_size];   //Buffer to store file list
- 	// ret = sd_card_list_files(NULL, buffer, &buffer_size);
-    // if(ret!=0) {
-	// 	LOG_ERR("SD Failed to list files");
-	// } else {
-    //     LOG_INF("Configured SD Card sucessfully");
-
-    // }
 
     const struct device *i2s_dev = DEVICE_DT_GET(DT_NODELABEL(i2s0));
 	if (!device_is_ready(i2s_dev)) {
@@ -110,8 +166,6 @@ int main(void)
 
     config_i2s_stream(i2s_dev);
 
-    void *buffer_pointer;
-    size_t bytes_read = 0;
 
     ret = i2s_trigger(i2s_dev, I2S_DIR_RX, I2S_TRIGGER_START);
     if (ret < 0) {
@@ -119,33 +173,37 @@ int main(void)
     }
 
     k_msleep(100); 
+    int available_slabs = k_mem_slab_num_free_get(&mem_slab);
 
-    for(int i = 0; i < 200; i ++) {
+    void *buffer_pointer;
+    size_t size;
 
-       // memset(buffer_pointer, 0, MAX_BLOCK_SIZE);
+    while(available_slabs > 0 && slab_counter < BLOCK_COUNT) {
 
-        ret = i2s_read(i2s_dev, &buffer_pointer, &bytes_read);
+        ret = i2s_read(i2s_dev, &buffer_pointer, &size);
         if (ret == 0) {
-            //LOG_INF("Successfully read %d bytes", bytes_read);
+            //LOG_INF("Successfully read %d bytes", size);
         } else {
-            LOG_ERR("Failed to read I2S data: %d", ret);
+            LOG_ERR("%d - read failed: %d", slab_counter, ret);
         }
+        //memset(buffer_pointer, 0, MAX_BLOCK_SIZE);
+        //k_mem_slab_free(&mem_slab, &buffer_pointer);
+        audio_buffers[slab_counter] = buffer_pointer;
+        buffer_sizes[slab_counter] = size;
 
-
-        // if (i > 100) {
-        //     LOG_INF("First byte: 0x%02x", ((uint8_t*)buffer_pointer)[0]);
-        //     LOG_INF("Second byte: 0x%02x", ((uint8_t*)buffer_pointer)[1]);
-        //     LOG_INF("Third byte: 0x%02x", ((uint8_t*)buffer_pointer)[2]);
-        //     LOG_INF("Fourth byte: 0x%02x", ((uint8_t*)buffer_pointer)[3]);
-        // }
-        memset(buffer_pointer, 0, MAX_BLOCK_SIZE);
-        k_mem_slab_free(&mem_slab, &buffer_pointer);
+        //LOG_INF("%d - got buffer %p of %u bytes", slab_counter, buffer_pointer, size);
+		available_slabs = k_mem_slab_num_free_get(&mem_slab);
+		slab_counter++;
 
     }
     //Dump the contents of the final buffer
-    LOG_HEXDUMP_INF(buffer_pointer, MAX_BLOCK_SIZE, "AUDIO DATA p");
-    while (1) {
-        k_msleep(200);
-    }
+    //LOG_HEXDUMP_INF(buffer_pointer, MAX_BLOCK_SIZE, "AUDIO DATA p");
+
+    write_wav();
+    // while (1) {
+    //     k_msleep(200);
+    // }
+    LOG_INF("Exiting");
+
 }
 
