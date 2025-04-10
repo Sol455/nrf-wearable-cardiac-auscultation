@@ -86,7 +86,7 @@ void write_wav() {
 				//16000, // hard coded header because fs_seek doesn't seem to be working.
 				MAX_SAMPLE_RATE, // bugbug: somehow the lc3 decoded data is
 				// returning twice as much data as expected...?
-				3,// bit depth octests
+				BYTES_PER_SAMPLE,// bit depth octests
 				1 // 1 channel
 			);
 		}
@@ -119,7 +119,6 @@ void write_wav() {
 
 }
 
-
 void null_checker(void *buffer, size_t size, int buffer_index)
 {
     uint32_t *samples = (uint32_t *)buffer;
@@ -129,7 +128,7 @@ void null_checker(void *buffer, size_t size, int buffer_index)
         if (samples[i] != 0xFFFFFFFF) {
             LOG_INF("Valid sample found at buffer index %d, index %d: 0x%08X", buffer_index, i, samples[i]);
         } else {
-            LOG_INF("nope: %d", i);
+            //LOG_INF("nope: %d", i);
         }
     }
 }
