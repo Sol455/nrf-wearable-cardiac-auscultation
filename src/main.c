@@ -31,7 +31,7 @@ LOG_MODULE_REGISTER(main);
 #define BLOCK_COUNT 20
 #define WAV_LENGTH_BLOCKS 100
 
-K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, 1, 32); //align to 32 bytes in memory
+K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 32); //align to 32 bytes in memory
 
 void *audio_buffers[BLOCK_COUNT];  // Array to store pointers to each block for initial SD tests
 size_t buffer_sizes[BLOCK_COUNT];
@@ -46,6 +46,35 @@ void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t p
 void sw1_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
     gpio_pin_toggle_dt(&led0);
+}
+
+void null_checker(void *buffer, size_t size, int buffer_index)
+{
+    uint32_t *samples = (uint32_t *)buffer;
+    int num_samples = size / sizeof(uint32_t);
+    int not_valid_count = 0;
+
+    for (int i = 0; i < num_samples; i++) {
+        if (samples[i] != 0xFFFFFFFF) {
+            LOG_INF("Valid sample found at buffer index %d, index %d: 0x%08X", buffer_index, i, samples[i]);
+        } else {
+            not_valid_count++;
+        }
+    }
+    LOG_INF("%d invalid samples found for buffer: %d", not_valid_count, buffer_index);
+}
+
+void print_middle_four_samples(void *buffer, size_t size)
+{
+    uint32_t *samples = (uint32_t *)buffer;
+    int total_samples = size / sizeof(uint32_t);
+    int start = total_samples / 2;
+
+    for (int i = 0; i < 4 && (start + i) < total_samples; i++) {
+        uint32_t raw = samples[start + i];
+        int32_t shifted = ((int32_t)raw) >> 12;  // Use top 20 bits
+        LOG_INF("Sample[%d] = raw: 0x%08X, shifted: %d", start + i, raw, shifted);
+    }
 }
 
 
@@ -83,20 +112,28 @@ void test_i2s(const struct device *i2s_dev) {
     void *buffer;
     size_t size;
     int ret;
+    uint8_t read_buf[MAX_BLOCK_SIZE]; 
 
     config_i2s_stream(i2s_dev);
 
     ret = i2s_trigger(i2s_dev, I2S_DIR_RX, I2S_TRIGGER_START);
     if (ret < 0) LOG_ERR("Start failed: %d", ret);
-
-    ret = i2s_read(i2s_dev, &buffer, &size);
+    
+    // Request single sample (but driver may take more)
+    for (int i = 0; i < 10; i++) {
+    ret = i2s_buf_read(i2s_dev, read_buf, &size);
     if (ret == 0) {
-        LOG_INF("Got buffer (%d bytes)", size);
-        dump_buffer(buffer, size);
-    } else {
-        LOG_ERR("Read failed: %d", ret);
+        // Verify single sample
+        uint32_t sample;
+        memcpy(&sample, buffer, sizeof(uint32_t));
+        LOG_INF("First sample: 0x%08X", sample);
+            
+        // Dump surrounding memory
+        //dump_buffer(read_buf, MAX_BLOCK_SIZE);
+        null_checker(read_buf, size,  1);
+            
+        }
     }
-    // k_mem_slab_free(&mem_slab_2, &buffer);  // Updated reference
 }
 
 
@@ -154,32 +191,7 @@ void write_wav() {
 
 }
 
-void null_checker(void *buffer, size_t size, int buffer_index)
-{
-    uint32_t *samples = (uint32_t *)buffer;
-    int num_samples = size / sizeof(uint32_t);
 
-    for (int i = 0; i < num_samples; i++) {
-        if (samples[i] != 0xFFFFFFFF) {
-            LOG_INF("Valid sample found at buffer index %d, index %d: 0x%08X", buffer_index, i, samples[i]);
-        } else {
-            //LOG_INF("nope: %d", i);
-        }
-    }
-}
-
-void print_middle_four_samples(void *buffer, size_t size)
-{
-    uint32_t *samples = (uint32_t *)buffer;
-    int total_samples = size / sizeof(uint32_t);
-    int start = total_samples / 2;
-
-    for (int i = 0; i < 4 && (start + i) < total_samples; i++) {
-        uint32_t raw = samples[start + i];
-        int32_t shifted = ((int32_t)raw) >> 12;  // Use top 20 bits
-        LOG_INF("Sample[%d] = raw: 0x%08X, shifted: %d", start + i, raw, shifted);
-    }
-}
 
 void i2s_loop_infinite_probe(const struct device *i2s_dev, int skip) {
     void *buffer_pointer;
