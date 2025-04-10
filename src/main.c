@@ -31,10 +31,12 @@ LOG_MODULE_REGISTER(main);
 #define BLOCK_COUNT 20
 #define WAV_LENGTH_BLOCKS 100
 
-K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 32); //align to 32 bytes in memory
+K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, 1, 32); //align to 32 bytes in memory
 
 void *audio_buffers[BLOCK_COUNT];  // Array to store pointers to each block for initial SD tests
 size_t buffer_sizes[BLOCK_COUNT];
+
+//K_MEM_SLAB_DEFINE_STATIC(mem_slab_2, BLOCK_SIZE, 1, 32);  // Single buffer
 
 void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
@@ -46,16 +48,28 @@ void sw1_callback(const struct device *dev, struct gpio_callback *cb, uint32_t p
     gpio_pin_toggle_dt(&led0);
 }
 
+
+void dump_buffer(void *buf, size_t size) {
+    uint32_t *samples = (uint32_t *)buf;
+    int num_samples = size / sizeof(uint32_t);
+    
+    LOG_INF("First 1000 samples:");
+    for (int i = 0; i < 1000 && i < num_samples; i++) {
+        LOG_INF("[%d] 0x%08X", i, samples[i]);
+    }
+}
+
 int config_i2s_stream(const struct device *i2s_dev) {
-    struct i2s_config i2s_cfg;
-	i2s_cfg.word_size = SAMPLE_BIT_WIDTH; 
-	i2s_cfg.channels = 2; //Mono
-	i2s_cfg.format = I2S_FMT_DATA_FORMAT_I2S;
-	i2s_cfg.options = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER | I2S_FMT_BIT_CLK_INV | I2S_FMT_FRAME_CLK_INV;
-	i2s_cfg.frame_clk_freq = MAX_SAMPLE_RATE;
-	i2s_cfg.mem_slab = &mem_slab;
-	i2s_cfg.block_size = MAX_BLOCK_SIZE;
-	i2s_cfg.timeout = READ_TIMEOUT;
+    struct i2s_config i2s_cfg = {
+        .word_size = SAMPLE_BIT_WIDTH,
+        .channels = 2,
+        .format = I2S_FMT_DATA_FORMAT_I2S,
+        .options = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER,
+        .frame_clk_freq = MAX_SAMPLE_RATE,
+        .mem_slab = &mem_slab,  // Updated reference
+        .block_size = MAX_BLOCK_SIZE,
+        .timeout = 1000
+    };
 
     int ret = i2s_configure(i2s_dev, I2S_DIR_RX, &i2s_cfg);
 	if (ret < 0) {
@@ -64,6 +78,27 @@ int config_i2s_stream(const struct device *i2s_dev) {
     }
     return 0;
 }
+
+void test_i2s(const struct device *i2s_dev) {
+    void *buffer;
+    size_t size;
+    int ret;
+
+    config_i2s_stream(i2s_dev);
+
+    ret = i2s_trigger(i2s_dev, I2S_DIR_RX, I2S_TRIGGER_START);
+    if (ret < 0) LOG_ERR("Start failed: %d", ret);
+
+    ret = i2s_read(i2s_dev, &buffer, &size);
+    if (ret == 0) {
+        LOG_INF("Got buffer (%d bytes)", size);
+        dump_buffer(buffer, size);
+    } else {
+        LOG_ERR("Read failed: %d", ret);
+    }
+    // k_mem_slab_free(&mem_slab_2, &buffer);  // Updated reference
+}
+
 
 int slab_counter = 0;
 
@@ -153,16 +188,6 @@ void i2s_loop_infinite_probe(const struct device *i2s_dev, int skip) {
     int buffer_index = skip;
     int ret;
 
-    //skip x buffers
-    while (skip > 0){
-        ret = i2s_read(i2s_dev, &buffer_pointer, &size);
-        if (ret != 0) {
-            LOG_ERR("%d - read failed: %d", buffer_index, ret);
-        }
-        k_mem_slab_free(&mem_slab, &buffer_pointer);
-        skip--;
-    }
-
     while(1) {
         ret = i2s_read(i2s_dev, &buffer_pointer, &size);
         if (ret == 0) {
@@ -179,7 +204,7 @@ void i2s_loop_infinite_probe(const struct device *i2s_dev, int skip) {
 
 }
 
-void void_i2s_fixed_length_write(const struct device *i2s_dev, int skip) {
+void i2s_fixed_length_write(const struct device *i2s_dev, int skip) {
     void *buffer_pointer;
     size_t size;
     int ret;
@@ -207,13 +232,15 @@ void void_i2s_fixed_length_write(const struct device *i2s_dev, int skip) {
         }
         audio_buffers[slab_counter] = buffer_pointer;
         buffer_sizes[slab_counter] = size;
+        if (available_slabs <= 1) {
+            LOG_HEXDUMP_INF(audio_buffers[slab_counter], MAX_BLOCK_SIZE, "AUDIO DATA p");
+        }
 		available_slabs = k_mem_slab_num_free_get(&mem_slab);
         buffer_index++;
 	    slab_counter++;
     }
 
     LOG_INF("Got here");
-
 
     write_wav();
 }
@@ -254,17 +281,20 @@ int main(void)
 	    LOG_WRN("%s is not ready\n", i2s_dev->name);
 	}
 
-    config_i2s_stream(i2s_dev);
-    ret = i2s_trigger(i2s_dev, I2S_DIR_RX, I2S_TRIGGER_START);
-    if (ret < 0) {
-        LOG_WRN("Failed to start the transmission: %d\n", ret);
-    }
+    // config_i2s_stream(i2s_dev);
+    // ret = i2s_trigger(i2s_dev, I2S_DIR_RX, I2S_TRIGGER_START);
+    // if (ret < 0) {
+    //     LOG_WRN("Failed to start the transmission: %d\n", ret);
+    // }
+    test_i2s(i2s_dev);
+
+    k_msleep(100);
 
 
-    i2s_loop_infinite_probe(i2s_dev, 20);
+    //i2s_loop_infinite_probe(i2s_dev, 20);
+    //i2s_fixed_length_write(i2s_dev, 20);
 
     //Dump the contents of the final buffer
-    LOG_HEXDUMP_INF(audio_buffers[slab_counter - 2], MAX_BLOCK_SIZE, "AUDIO DATA p");
 
 
     LOG_INF("Exiting");

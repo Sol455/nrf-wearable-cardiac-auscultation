@@ -31,55 +31,55 @@ config RESET_ON_FATAL_ERROR
 
 # Default Config for Debug and Release build
 config HW_CODEC_CIRRUS_LOGIC
-	default y
+	default n
 
 config BT
-	default y
+	default n
 
-#config BOARD_ENABLE_DCDC_APP
-#	default y
+config BOARD_ENABLE_DCDC_APP
+	default n
 
-#config BOARD_ENABLE_DCDC_NET
-#	default y
+config BOARD_ENABLE_DCDC_NET
+	default n
 
 config BOARD_ENABLE_CPUNET
-	default y
+	default n
 
 config NFCT_PINS_AS_GPIOS
-	default y
+	default n
 
 config ZBUS
-	default y
+	default n
 
 config ZBUS_RUNTIME_OBSERVERS
-	default y
+	default n
 
 config ZBUS_MSG_SUBSCRIBER
-	default y
+	default n
 
 config SENSOR
-	default y
+	default n
 
 config REGULATOR
-	default y
+	default n
 
 config CONTIN_ARRAY
-	default y
+	default n
 
 config NRFX_I2S0
-	default y
+	default n
 
 config PCM_MIX
-	default y
+	default n
 
 config TONE
-	default y
+	default n
 
 config PSCM
-	default y
+	default n
 
 config DATA_FIFO
-	default y
+	default n
 
 # Enable NRFX_CLOCK for ACLK control
 config NRFX_CLOCK
@@ -146,8 +146,8 @@ config FS_FATFS_EXFAT
 config FS_FATFS_MAX_LFN
 	default 255
 
-#config BT_LL_ACS_NRF53
-#	default y
+config BT_LL_ACS_NRF53
+	default y
 
 config WATCHDOG
 	default y

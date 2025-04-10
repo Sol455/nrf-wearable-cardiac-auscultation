@@ -1,70 +1,70 @@
-# #
-# # Copyright (c) 2022 Nordic Semiconductor ASA
-# #
-# # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
-# #
+# # #
+# # # Copyright (c) 2022 Nordic Semiconductor ASA
+# # #
+# # # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+# # #
 
-# rsource "Kconfig.defaults"
+# # rsource "Kconfig.defaults"
 
-menu "Audio"
+# menu "Audio"
 
-choice AUDIO_SAMPLE_RATE
-	prompt "Audio sample rate"
-	default AUDIO_SAMPLE_RATE_16000_HZ
-	help
-	  This will be selected based on the BAP settings.
-
-config AUDIO_SAMPLE_RATE_16000_HZ
-	bool "16 kHz"
-	help
-	  Sample rate of 16kHz is currently only valid for I2S/line-in.
-
-# config AUDIO_SAMPLE_RATE_24000_HZ
-# 	bool "24 kHz"
+# choice AUDIO_SAMPLE_RATE
+# 	prompt "Audio sample rate"
+# 	default AUDIO_SAMPLE_RATE_16000_HZ
 # 	help
-# 	  Sample rate of 24kHz is currently only valid for I2S/line-in.
+# 	  This will be selected based on the BAP settings.
 
-# config AUDIO_SAMPLE_RATE_48000_HZ
-# 	bool "48 kHz"
+# config AUDIO_SAMPLE_RATE_16000_HZ
+# 	bool "16 kHz"
 # 	help
-# 	  Sample rate of 48kHz is valid for both I2S/line-in and USB.
-endchoice
+# 	  Sample rate of 16kHz is currently only valid for I2S/line-in.
 
-config AUDIO_SAMPLE_RATE_HZ
-	int
-	default 16000 if AUDIO_SAMPLE_RATE_16000_HZ
-# default 24000 if AUDIO_SAMPLE_RATE_24000_HZ
-# default 48000 if AUDIO_SAMPLE_RATE_48000_HZ
-help
-  I2S supports 16, 24, and 48 kHz sample rates for both input and output.
-  USB supports only 48 kHz for input.
+# # config AUDIO_SAMPLE_RATE_24000_HZ
+# # 	bool "24 kHz"
+# # 	help
+# # 	  Sample rate of 24kHz is currently only valid for I2S/line-in.
 
-choice AUDIO_BIT_DEPTH
-	prompt "Audio bit depth"
-	default AUDIO_BIT_DEPTH_16
-	help
-	  Select the bit depth for audio.
+# # config AUDIO_SAMPLE_RATE_48000_HZ
+# # 	bool "48 kHz"
+# # 	help
+# # 	  Sample rate of 48kHz is valid for both I2S/line-in and USB.
+# endchoice
 
-config AUDIO_BIT_DEPTH_16
-	bool "16 bit audio"
+# config AUDIO_SAMPLE_RATE_HZ
+# 	int
+# 	default 16000 if AUDIO_SAMPLE_RATE_16000_HZ
+# # default 24000 if AUDIO_SAMPLE_RATE_24000_HZ
+# # default 48000 if AUDIO_SAMPLE_RATE_48000_HZ
+# help
+#   I2S supports 16, 24, and 48 kHz sample rates for both input and output.
+#   USB supports only 48 kHz for input.
 
-# config AUDIO_BIT_DEPTH_32
-# 	bool "32 bit audio"
-endchoice
+# choice AUDIO_BIT_DEPTH
+# 	prompt "Audio bit depth"
+# 	default AUDIO_BIT_DEPTH_16
+# 	help
+# 	  Select the bit depth for audio.
 
-config AUDIO_BIT_DEPTH_BITS
-	int
-	default 16 if AUDIO_BIT_DEPTH_16
-# default 32 if AUDIO_BIT_DEPTH_32
-help
-  Bit depth of one sample in storage.
+# config AUDIO_BIT_DEPTH_16
+# 	bool "16 bit audio"
 
-config AUDIO_BIT_DEPTH_OCTETS
-	int
-	default 2 if AUDIO_BIT_DEPTH_16
-# default 4 if AUDIO_BIT_DEPTH_32
-help
-  Bit depth of one sample in storage given in octets.
+# # config AUDIO_BIT_DEPTH_32
+# # 	bool "32 bit audio"
+# endchoice
+
+# config AUDIO_BIT_DEPTH_BITS
+# 	int
+# 	default 16 if AUDIO_BIT_DEPTH_16
+# # default 32 if AUDIO_BIT_DEPTH_32
+# help
+#   Bit depth of one sample in storage.
+
+# config AUDIO_BIT_DEPTH_OCTETS
+# 	int
+# 	default 2 if AUDIO_BIT_DEPTH_16
+# # default 4 if AUDIO_BIT_DEPTH_32
+# help
+#   Bit depth of one sample in storage given in octets.
 
 # choice AUDIO_FRAME_DURATION
 # 	prompt "Select frame duration - 7.5 ms frame duration is not tested"
@@ -362,4 +362,4 @@ help
 # 	default 4
 
 # endmenu # Zbus
-endmenu # Audio
+# endmenu # Audio
