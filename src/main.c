@@ -178,7 +178,9 @@ int main(void)
     void *buffer_pointer;
     size_t size;
 
-    while(available_slabs > 0 && slab_counter < BLOCK_COUNT) {
+    //while(available_slabs > 0 && slab_counter < BLOCK_COUNT) {
+    while(1) {
+
 
         ret = i2s_read(i2s_dev, &buffer_pointer, &size);
         if (ret == 0) {
@@ -187,13 +189,14 @@ int main(void)
             LOG_ERR("%d - read failed: %d", slab_counter, ret);
         }
         //memset(buffer_pointer, 0, MAX_BLOCK_SIZE);
-        //k_mem_slab_free(&mem_slab, &buffer_pointer);
-        audio_buffers[slab_counter] = buffer_pointer;
-        buffer_sizes[slab_counter] = size;
+        k_mem_slab_free(&mem_slab, &buffer_pointer);
+
+        //audio_buffers[slab_counter] = buffer_pointer;
+        //buffer_sizes[slab_counter] = size;
 
         //LOG_INF("%d - got buffer %p of %u bytes", slab_counter, buffer_pointer, size);
 		available_slabs = k_mem_slab_num_free_get(&mem_slab);
-		slab_counter++;
+		//slab_counter++;
 
     }
     //Dump the contents of the final buffer
