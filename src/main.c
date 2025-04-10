@@ -20,15 +20,15 @@ LOG_MODULE_REGISTER(main);
 
 //Mek slab for I2s Audio Driver
 #define MAX_SAMPLE_RATE  16000
-#define SAMPLE_BIT_WIDTH 24
-#define BYTES_PER_SAMPLE 3
+#define SAMPLE_BIT_WIDTH 32
+#define BYTES_PER_SAMPLE 4
 #define READ_TIMEOUT     1000
 
 #define BLOCK_SIZE(_sample_rate, _number_of_channels) \
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
 
 #define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 1)
-#define BLOCK_COUNT 25
+#define BLOCK_COUNT 20
 #define WAV_LENGTH_BLOCKS 100
 
 K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 32); //align to 32 bytes in memory
@@ -50,8 +50,8 @@ int config_i2s_stream(const struct device *i2s_dev) {
     struct i2s_config i2s_cfg;
 	i2s_cfg.word_size = SAMPLE_BIT_WIDTH; 
 	i2s_cfg.channels = 1; //Mono
-	i2s_cfg.format = I2S_FMT_DATA_FORMAT_LEFT_JUSTIFIED;
-	i2s_cfg.options = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER;
+	i2s_cfg.format = I2S_FMT_DATA_FORMAT_I2S;
+	i2s_cfg.options = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER | I2S_FMT_BIT_CLK_INV | I2S_FMT_FRAME_CLK_INV;
 	i2s_cfg.frame_clk_freq = MAX_SAMPLE_RATE;
 	i2s_cfg.mem_slab = &mem_slab;
 	i2s_cfg.block_size = MAX_BLOCK_SIZE;
@@ -153,10 +153,10 @@ int main(void)
 
     LOG_INF("Configured Buttons & Interrupts");
 
-    ret = sd_card_init();
-	if(ret!=0) {
-		LOG_ERR("SD Failed to init");
-	}
+    // ret = sd_card_init();
+	// if(ret!=0) {
+	// 	LOG_ERR("SD Failed to init");
+	// }
 
 
     const struct device *i2s_dev = DEVICE_DT_GET(DT_NODELABEL(i2s0));
@@ -172,37 +172,56 @@ int main(void)
         LOG_WRN("Failed to start the transmission: %d\n", ret);
     }
 
-    k_msleep(100); 
+   //k_msleep(100); 
     int available_slabs = k_mem_slab_num_free_get(&mem_slab);
 
     void *buffer_pointer;
     size_t size;
 
+    int skip = 20;
+
+    //skip x buffers
+    while (skip > 0){
+        ret = i2s_read(i2s_dev, &buffer_pointer, &size);
+        if (ret != 0) {
+            LOG_ERR("%d - read failed: %d", slab_counter, ret);
+        }
+        k_mem_slab_free(&mem_slab, &buffer_pointer);
+        skip--;
+    }
+
     //while(available_slabs > 0 && slab_counter < BLOCK_COUNT) {
     while(1) {
-
-
         ret = i2s_read(i2s_dev, &buffer_pointer, &size);
         if (ret == 0) {
+            uint32_t first_raw_sample = *((uint32_t *)buffer_pointer);
+            int32_t signed_sample = ((int32_t)first_raw_sample) >> 12;
+            uint32_t *samples = (uint32_t *)buffer_pointer;
+            for (int i = 0; i < 4; i++) {
+                int32_t shifted = ((int32_t)samples[i]) >> 12;
+                LOG_INF("Sample[%d]: %d", i, shifted);
+                }
+             // Shift for 20-bit data
+            //LOG_INF("Buffer OK. First sample: raw=0x%08X, shifted=%d",first_raw_sample, signed_sample);
             //LOG_INF("Successfully read %d bytes", size);
         } else {
             LOG_ERR("%d - read failed: %d", slab_counter, ret);
         }
+
+        audio_buffers[slab_counter] = buffer_pointer;
+        buffer_sizes[slab_counter] = size;
         //memset(buffer_pointer, 0, MAX_BLOCK_SIZE);
         k_mem_slab_free(&mem_slab, &buffer_pointer);
 
-        //audio_buffers[slab_counter] = buffer_pointer;
-        //buffer_sizes[slab_counter] = size;
-
         //LOG_INF("%d - got buffer %p of %u bytes", slab_counter, buffer_pointer, size);
-		available_slabs = k_mem_slab_num_free_get(&mem_slab);
-		//slab_counter++;
+		//available_slabs = k_mem_slab_num_free_get(&mem_slab);
+		slab_counter++;
 
     }
     //Dump the contents of the final buffer
-    //LOG_HEXDUMP_INF(buffer_pointer, MAX_BLOCK_SIZE, "AUDIO DATA p");
+    LOG_HEXDUMP_INF(audio_buffers[slab_counter - 2], MAX_BLOCK_SIZE, "AUDIO DATA p");
 
-    write_wav();
+    //write_wav();
     // while (1) {
     //     k_msleep(200);
     // }
