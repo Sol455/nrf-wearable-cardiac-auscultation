@@ -27,7 +27,7 @@ LOG_MODULE_REGISTER(main);
 #define BLOCK_SIZE(_sample_rate, _number_of_channels) \
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
 
-#define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 1)
+#define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 2)
 #define BLOCK_COUNT 20
 #define WAV_LENGTH_BLOCKS 100
 
@@ -49,7 +49,7 @@ void sw1_callback(const struct device *dev, struct gpio_callback *cb, uint32_t p
 int config_i2s_stream(const struct device *i2s_dev) {
     struct i2s_config i2s_cfg;
 	i2s_cfg.word_size = SAMPLE_BIT_WIDTH; 
-	i2s_cfg.channels = 1; //Mono
+	i2s_cfg.channels = 2; //Mono
 	i2s_cfg.format = I2S_FMT_DATA_FORMAT_I2S;
 	i2s_cfg.options = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER | I2S_FMT_BIT_CLK_INV | I2S_FMT_FRAME_CLK_INV;
 	i2s_cfg.frame_clk_freq = MAX_SAMPLE_RATE;
@@ -65,14 +65,15 @@ int config_i2s_stream(const struct device *i2s_dev) {
     return 0;
 }
 
-static struct fs_file_t wav_file;
 int slab_counter = 0;
 
 void write_wav() {
 
+    static struct fs_file_t wav_file;
+
 	fs_file_t_init(&wav_file);
 
-	int ret = sd_card_open_for_write("poortaa.wav", &wav_file);
+	int ret = sd_card_open_for_write("april10.wav", &wav_file);
 		if (ret!= 0) {
 			LOG_ERR("Failed to open file, rc=%d", ret);
 			//return err;	
@@ -116,16 +117,106 @@ void write_wav() {
             LOG_INF("CLOSED SD CARD");
         }
 
-        // size_t buffer_size = 1024;
- 	    // char buffer[buffer_size];   //Buffer to store file list
- 	    // ret = sd_card_list_files(NULL, buffer, &buffer_size);
-        // if(ret!=0) {
-	    // 	LOG_ERR("SD Failed to list files");
-	    // } else {
-        //     LOG_INF("Configured SD Card sucessfully");
-        // }
+}
 
 
+void null_checker(void *buffer, size_t size, int buffer_index)
+{
+    uint32_t *samples = (uint32_t *)buffer;
+    int num_samples = size / sizeof(uint32_t);
+
+    for (int i = 0; i < num_samples; i++) {
+        if (samples[i] != 0xFFFFFFFF) {
+            LOG_INF("Valid sample found at buffer index %d, index %d: 0x%08X", buffer_index, i, samples[i]);
+        } else {
+            LOG_INF("nope: %d", i);
+        }
+    }
+}
+
+void print_middle_four_samples(void *buffer, size_t size)
+{
+    uint32_t *samples = (uint32_t *)buffer;
+    int total_samples = size / sizeof(uint32_t);
+    int start = total_samples / 2;
+
+    for (int i = 0; i < 4 && (start + i) < total_samples; i++) {
+        uint32_t raw = samples[start + i];
+        int32_t shifted = ((int32_t)raw) >> 12;  // Use top 20 bits
+        LOG_INF("Sample[%d] = raw: 0x%08X, shifted: %d", start + i, raw, shifted);
+    }
+}
+
+void i2s_loop_infinite_probe(const struct device *i2s_dev, int skip) {
+    void *buffer_pointer;
+    size_t size;
+
+    int buffer_index = skip;
+    int ret;
+
+    //skip x buffers
+    while (skip > 0){
+        ret = i2s_read(i2s_dev, &buffer_pointer, &size);
+        if (ret != 0) {
+            LOG_ERR("%d - read failed: %d", buffer_index, ret);
+        }
+        k_mem_slab_free(&mem_slab, &buffer_pointer);
+        skip--;
+    }
+
+    while(1) {
+        ret = i2s_read(i2s_dev, &buffer_pointer, &size);
+        if (ret == 0) {
+        null_checker(buffer_pointer, size, buffer_index);
+        print_middle_four_samples(buffer_pointer, size);
+
+        } else {
+            LOG_ERR("%d - read failed: %d", buffer_index, ret);
+        }
+
+        k_mem_slab_free(&mem_slab, &buffer_pointer);
+        buffer_index++;
+    }
+
+}
+
+void void_i2s_fixed_length_write(const struct device *i2s_dev, int skip) {
+    void *buffer_pointer;
+    size_t size;
+    int ret;
+    int buffer_index = skip;
+    //skip x buffers
+    // while (skip > 0){
+    //     ret = i2s_read(i2s_dev, &buffer_pointer, &size);
+    //     if (ret != 0) {
+    //         LOG_ERR("%d - read failed: %d", slab_counter, ret);
+    //     }
+    //     k_mem_slab_free(&mem_slab, &buffer_pointer);
+    //     skip--;
+    // }
+
+    int available_slabs = k_mem_slab_num_free_get(&mem_slab);
+
+    while(available_slabs > 0 && slab_counter < BLOCK_COUNT) {
+        ret = i2s_read(i2s_dev, &buffer_pointer, &size);
+
+        if (ret == 0) {
+        //null_checker(buffer_pointer, size, buffer_index);
+        //print_middle_four_samples(buffer_pointer, size);
+        } else {
+            LOG_ERR("%d - read failed: %d", slab_counter, ret);
+        }
+        audio_buffers[slab_counter] = buffer_pointer;
+        buffer_sizes[slab_counter] = size;
+		available_slabs = k_mem_slab_num_free_get(&mem_slab);
+        buffer_index++;
+	    slab_counter++;
+    }
+
+    LOG_INF("Got here");
+
+
+    write_wav();
 }
 
 int main(void)
@@ -152,12 +243,12 @@ int main(void)
     gpio_add_callback(sw1.port, &sw1_cb);
 
     LOG_INF("Configured Buttons & Interrupts");
+    LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
 
-    // ret = sd_card_init();
-	// if(ret!=0) {
-	// 	LOG_ERR("SD Failed to init");
-	// }
-
+    ret = sd_card_init();
+	if(ret!=0) {
+		LOG_ERR("SD Failed to init");
+	}
 
     const struct device *i2s_dev = DEVICE_DT_GET(DT_NODELABEL(i2s0));
 	if (!device_is_ready(i2s_dev)) {
@@ -165,66 +256,18 @@ int main(void)
 	}
 
     config_i2s_stream(i2s_dev);
-
-
     ret = i2s_trigger(i2s_dev, I2S_DIR_RX, I2S_TRIGGER_START);
     if (ret < 0) {
         LOG_WRN("Failed to start the transmission: %d\n", ret);
     }
 
-   //k_msleep(100); 
-    int available_slabs = k_mem_slab_num_free_get(&mem_slab);
 
-    void *buffer_pointer;
-    size_t size;
+    i2s_loop_infinite_probe(i2s_dev, 20);
 
-    int skip = 20;
-
-    //skip x buffers
-    while (skip > 0){
-        ret = i2s_read(i2s_dev, &buffer_pointer, &size);
-        if (ret != 0) {
-            LOG_ERR("%d - read failed: %d", slab_counter, ret);
-        }
-        k_mem_slab_free(&mem_slab, &buffer_pointer);
-        skip--;
-    }
-
-    //while(available_slabs > 0 && slab_counter < BLOCK_COUNT) {
-    while(1) {
-        ret = i2s_read(i2s_dev, &buffer_pointer, &size);
-        if (ret == 0) {
-            uint32_t first_raw_sample = *((uint32_t *)buffer_pointer);
-            int32_t signed_sample = ((int32_t)first_raw_sample) >> 12;
-            uint32_t *samples = (uint32_t *)buffer_pointer;
-            for (int i = 0; i < 4; i++) {
-                int32_t shifted = ((int32_t)samples[i]) >> 12;
-                LOG_INF("Sample[%d]: %d", i, shifted);
-                }
-             // Shift for 20-bit data
-            //LOG_INF("Buffer OK. First sample: raw=0x%08X, shifted=%d",first_raw_sample, signed_sample);
-            //LOG_INF("Successfully read %d bytes", size);
-        } else {
-            LOG_ERR("%d - read failed: %d", slab_counter, ret);
-        }
-
-        audio_buffers[slab_counter] = buffer_pointer;
-        buffer_sizes[slab_counter] = size;
-        //memset(buffer_pointer, 0, MAX_BLOCK_SIZE);
-        k_mem_slab_free(&mem_slab, &buffer_pointer);
-
-        //LOG_INF("%d - got buffer %p of %u bytes", slab_counter, buffer_pointer, size);
-		//available_slabs = k_mem_slab_num_free_get(&mem_slab);
-		slab_counter++;
-
-    }
     //Dump the contents of the final buffer
     LOG_HEXDUMP_INF(audio_buffers[slab_counter - 2], MAX_BLOCK_SIZE, "AUDIO DATA p");
 
-    //write_wav();
-    // while (1) {
-    //     k_msleep(200);
-    // }
+
     LOG_INF("Exiting");
 
 }
