@@ -32,10 +32,17 @@ LOG_MODULE_REGISTER(main);
 #define BLOCK_COUNT 20
 #define WAV_LENGTH_BLOCKS 100
 
-K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 32); //align to 32 bytes in memory
+K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 4);
 
-void *audio_buffers[BLOCK_COUNT];  // Array to store pointers to each block for initial SD tests
-size_t buffer_sizes[BLOCK_COUNT];
+struct save_wave_msg {
+	void *buffer;
+	size_t size;
+	struct fs_file_t *audio_file
+};
+
+uint8_t writing = 0;
+
+K_MSGQ_DEFINE(device_message_queue, sizeof(struct save_wave_msg), 8, 4);
 
 
 void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
@@ -77,7 +84,6 @@ void print_middle_four_samples(void *buffer, size_t size)
     }
 }
 
-
 void dump_buffer(void *buf, size_t size) {
     uint32_t *samples = (uint32_t *)buf;
     int num_samples = size / sizeof(uint32_t);
@@ -88,115 +94,163 @@ void dump_buffer(void *buf, size_t size) {
     }
 }
 
+void open_wav_for_write(struct fs_file_t *audio_file, char* file_name) { //@to-do add settings in here
+	int ret = sd_card_init();
+	fs_file_t_init(audio_file);
+	if(ret!=0) {
+		LOG_ERR("SD Failed to init");
+	}
 
-int slab_counter = 0;
+	ret = sd_card_open_for_write(file_name, audio_file);
 
-void write_wav() {
-
-    static struct fs_file_t wav_file;
-	fs_file_t_init(&wav_file);
-
-	int ret = sd_card_open_for_write("april10.wav", &wav_file);
 		if (ret!= 0) {
 			LOG_ERR("Failed to open file, rc=%d", ret);
-			//return err;	
 			} else {
 			LOG_INF("Opened SD card sucessfully");
-
 			ret = write_wav_header(
-				&wav_file,
-				slab_counter * MAX_BLOCK_SIZE,
+				audio_file,
+				WAV_LENGTH_BLOCKS * 3200, //@TO-DO remove global variable // record length 
 				MAX_SAMPLE_RATE, 
 				BYTES_PER_SAMPLE,// bit depth octests
 				1 // 1 channel
 			);
 		}
-		if(ret!=0) {
-			LOG_ERR("Failed to write wav header");
+}
+
+//Thread 2
+static void write_audio_blocks() {
+		//wait for process message
+		struct save_wave_msg msg;
+
+		while(1) {
+			if (k_msgq_get(&device_message_queue, &msg, K_FOREVER) == 0) {
+				LOG_INF("Consumer: Received data %p\n", msg.buffer);
+				/* Process the received data here */
+
+				int ret = 0;
+				if(ret!=0) {
+					LOG_ERR("Failed to write wav header");
+					//return 0;
+				}
+				ret = write_wav_data(msg.audio_file, msg.buffer, msg.size);
+
+				k_mem_slab_free(&mem_slab, msg.buffer);
+				if (ret != 0) {
+					LOG_ERR("Failed to write to file, rc=%d", ret);
+					return;
+				}
+				LOG_INF("Written Data sucessfully");
+				writing = 0;
+
+        	}
+		}
+}
+
+void stop_capture(struct device *dmic_dev, struct fs_file_t *audio_file) {
+		int ret = dmic_trigger(dmic_dev, DMIC_TRIGGER_STOP);
+		if (ret < 0) {
+			LOG_ERR("STOP trigger failed: %d", ret);
+		}
+		sd_card_close(audio_file);
+}
+
+//main thread
+int record_audio(const struct device *dmic_dev, size_t block_count, struct fs_file_t *audio_file)
+{
+	int ret;
+	int write_counter = 0;
+	struct save_wave_msg msg;
+
+	ret = dmic_trigger(dmic_dev, DMIC_TRIGGER_START);
+		if (ret < 0) {
+			LOG_ERR("START trigger failed: %d", ret);
+			return ret;
+		}
+	//start recording blocks ---->
+	while(write_counter < block_count) {
+		ret = dmic_read(dmic_dev, 0, &msg.buffer, &msg.size, READ_TIMEOUT);
+		if (ret < 0) {
+			LOG_ERR("%d - read failed: %d", write_counter, ret);
+			return ret;
+		}
+
+		msg.audio_file = audio_file;
+		LOG_INF("%d - got buffer %p of %u bytes", write_counter, msg.buffer, msg.size);
+		//send message with buffers and pointers here --->
+
+		writing = 1;
+		ret = k_msgq_put(&device_message_queue, &msg, K_NO_WAIT);
+
+		if (ret < 0) {
+    	LOG_ERR("Failed to enqueue message: %d", ret);
+    	return ret;
+		}
+		//---> pub sub send---->>
+		write_counter++;
+	}
+
+	while (1) {
+		if (writing == 0){
+			stop_capture(dmic_dev, audio_file);
+			break;
+		} else  {
+			k_sleep(K_MSEC(100));
+		}
+	}
+
+	LOG_INF("Recording finished");
+
+	return ret;
+}
+
+int pwm_config(const struct device *dmic_dev, uint8_t gain) {
+
+		if (!device_is_ready(dmic_dev)) {
+			LOG_ERR("%s is not ready", dmic_dev->name);
 			return 0;
 		}
-		for(int i =0; i < slab_counter; i++) {
-			//LOG_HEXDUMP_INF((uint8_t *)audio_buffers[i], buffer_sizes[i], "Received audio data:");		
-			int ret = write_wav_data(&wav_file, audio_buffers[i], buffer_sizes[i]);
-			k_mem_slab_free(&mem_slab, &audio_buffers[i]);
-		if (ret != 0) {
-			LOG_ERR("Failed to write to file, rc=%d", ret);
-			return;
+
+		struct pcm_stream_cfg stream = {
+			.pcm_width = SAMPLE_BIT_WIDTH,
+			.mem_slab  = &mem_slab,
+		};
+
+		struct dmic_cfg cfg = {
+			.io = {
+				.min_pdm_clk_freq = 1000000,
+				.max_pdm_clk_freq = 3500000,
+				.min_pdm_clk_dc   = 40,
+				.max_pdm_clk_dc   = 60,
+			},
+			.streams = &stream,
+			.channel = {
+				.req_num_streams = 1,
+			},
+		};
+
+		cfg.channel.req_num_chan = 1;
+		cfg.channel.req_chan_map_lo =
+			dmic_build_channel_map(0, 0, PDM_CHAN_LEFT);
+		cfg.streams[0].pcm_rate = MAX_SAMPLE_RATE;
+		cfg.streams[0].block_size = BLOCK_SIZE(cfg.streams[0].pcm_rate, cfg.channel.req_num_chan);
+
+		int ret = dmic_configure(dmic_dev, &cfg);
+		if (ret < 0) {
+			LOG_ERR("Failed to configure the driver: %d", ret);
+			return ret;
 		}
-		}
-		ret = sd_card_close(&wav_file);
-        if (ret != 0) {
-			LOG_ERR("Failed to close SD card");
-			return;
-		} else {
-            LOG_INF("CLOSED SD CARD");
-        }
-
+	        
+		nrf_pdm_gain_set(NRF_PDM0_S, gain, gain);
+		uint8_t l_gain, r_gain;
+		nrf_pdm_gain_get(NRF_PDM0_S, &l_gain, &r_gain);
+		LOG_INF("LEFT GAIN: %d, RIGHT GAIN: %d", l_gain, r_gain);
+		return 0;
 }
-
-static int do_pdm_transfer(const struct device *dmic_dev,
-    struct dmic_cfg *cfg,
-    size_t block_count)
-{
-int ret;
-
-LOG_INF("PCM output rate: %u, channels: %u",
-cfg->streams[0].pcm_rate, cfg->channel.req_num_chan);
-
-
-ret = dmic_configure(dmic_dev, cfg);
-if (ret < 0) {
-LOG_ERR("Failed to configure the driver: %d", ret);
-return ret;
-}
-
-ret = dmic_trigger(dmic_dev, DMIC_TRIGGER_START);
-if (ret < 0) {
-LOG_ERR("START trigger failed: %d", ret);
-return ret;
-}
-
-int available_slabs = k_mem_slab_num_free_get(&mem_slab);
-
-
-while(available_slabs > 0) {
-void *buffer;
-uint32_t size;
-//LOG_INF("Before read, Memory slab: %d free blocks", k_mem_slab_num_free_get(&mem_slab));
-ret = dmic_read(dmic_dev, 0, &buffer, &size, READ_TIMEOUT);
-//LOG_INF("After read, Memory slab: %d free blocks", k_mem_slab_num_free_get(&mem_slab));
-if (ret < 0) {
- LOG_ERR("%d - read failed: %d", slab_counter, ret);
- return ret;
-}
-
-audio_buffers[slab_counter] = buffer;
-buffer_sizes[slab_counter] = size;
-
-LOG_INF("%d - got buffer %p of %u bytes", slab_counter, buffer, size);
-available_slabs = k_mem_slab_num_free_get(&mem_slab);
-slab_counter++;
-
-null_checker(audio_buffers[slab_counter], buffer_sizes[slab_counter], slab_counter);
-
-}
-ret = dmic_trigger(dmic_dev, DMIC_TRIGGER_STOP);
-if (ret < 0) {
- LOG_ERR("STOP trigger failed: %d", ret);
- return ret;
-}
-
-LOG_INF("Capture complete. Processing data...");
-
-write_wav();
-
-return ret;
-}
-
 
 int main(void)
 {
     int ret;
+    static struct fs_file_t wav_file;
 
     LOG_INF("Turning on");
     ret = device_is_ready(led0.port);
@@ -220,51 +274,21 @@ int main(void)
     LOG_INF("Configured Buttons & Interrupts");
     LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
 
-    ret = sd_card_init();
-	if(ret!=0) {
-		LOG_ERR("SD Failed to init");
-	}
 	const struct device *const dmic_dev = DEVICE_DT_GET(DT_NODELABEL(pdm0));
-
-	if (!device_is_ready(dmic_dev)) {
-		LOG_ERR("%s is not ready", dmic_dev->name);
-		return 0;
+	ret = pwm_config(dmic_dev, NRF_PDM_GAIN_MAXIMUM);
+	if (ret != 0) {
+		LOG_ERR("CONFIG FAILED", dmic_dev->name);
 	}
 
-	struct pcm_stream_cfg stream = {
-		.pcm_width = SAMPLE_BIT_WIDTH,
-		.mem_slab  = &mem_slab,
-	};
+	//Open SD for read
+	open_wav_for_write(&wav_file, "test_wav.wav");
 
-	struct dmic_cfg cfg = {
-		.io = {
-			.min_pdm_clk_freq = 1000000,
-			.max_pdm_clk_freq = 3500000,
-			.min_pdm_clk_dc   = 40,
-			.max_pdm_clk_dc   = 60,
-		},
-		.streams = &stream,
-		.channel = {
-			.req_num_streams = 1,
-		},
-	};
-
-	cfg.channel.req_num_chan = 1;
-	cfg.channel.req_chan_map_lo = dmic_build_channel_map(0, 0, PDM_CHAN_LEFT);
-	cfg.streams[0].pcm_rate = MAX_SAMPLE_RATE;
-	cfg.streams[0].block_size = BLOCK_SIZE(cfg.streams[0].pcm_rate, cfg.channel.req_num_chan);
-
-	LOG_INF("block size %i", cfg.streams[0].block_size);
-	LOG_INF("Memory slab: %d free blocks", k_mem_slab_num_free_get(&mem_slab));
-
-
-	ret = do_pdm_transfer(dmic_dev, &cfg, 2 * BLOCK_COUNT);
-	if (ret < 0) {
-		return 0;
-	}
+	//Thread --> Grab Audio
+	record_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
 
 	LOG_INF("Exiting");
 	return 0;
 
 }
 
+K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, write_audio_blocks, NULL, NULL, NULL, 3, 0, 0);
