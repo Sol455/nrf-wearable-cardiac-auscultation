@@ -40,20 +40,16 @@ struct save_wave_msg {
 	struct fs_file_t *audio_file
 };
 
+typedef enum {
+    STATE_IDLE,
+    STATE_RECORDING,
+} AudioState;
+
+AudioState audio_state = STATE_IDLE;
 uint8_t writing = 0;
 
 K_MSGQ_DEFINE(device_message_queue, sizeof(struct save_wave_msg), 8, 4);
 
-
-void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
-{
-    gpio_pin_toggle_dt(&led0);
-}
-
-void sw1_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
-{
-    gpio_pin_toggle_dt(&led0);
-}
 
 void null_checker(void *buffer, size_t size, int buffer_index)
 {
@@ -115,6 +111,9 @@ void open_wav_for_write(struct fs_file_t *audio_file, char* file_name) { //@to-d
 				1 // 1 channel
 			);
 		}
+
+    LOG_INF("fixed this!");
+
 }
 
 //Thread 2
@@ -152,7 +151,9 @@ void stop_capture(struct device *dmic_dev, struct fs_file_t *audio_file) {
 			LOG_ERR("STOP trigger failed: %d", ret);
 		}
 		sd_card_close(audio_file);
+        audio_state = STATE_IDLE;
 }
+
 
 //main thread
 int record_audio(const struct device *dmic_dev, size_t block_count, struct fs_file_t *audio_file)
@@ -239,12 +240,24 @@ int pwm_config(const struct device *dmic_dev, uint8_t gain) {
 			LOG_ERR("Failed to configure the driver: %d", ret);
 			return ret;
 		}
-	        
 		nrf_pdm_gain_set(NRF_PDM0_S, gain, gain);
 		uint8_t l_gain, r_gain;
 		nrf_pdm_gain_get(NRF_PDM0_S, &l_gain, &r_gain);
 		LOG_INF("LEFT GAIN: %d, RIGHT GAIN: %d", l_gain, r_gain);
 		return 0;
+}
+
+void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
+    if (audio_state == STATE_IDLE) {
+        audio_state = STATE_RECORDING;
+    }
+    //gpio_pin_toggle_dt(&led0);
+}
+
+void sw1_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
+{
+
 }
 
 int main(void)
@@ -274,17 +287,31 @@ int main(void)
     LOG_INF("Configured Buttons & Interrupts");
     LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
 
-	const struct device *const dmic_dev = DEVICE_DT_GET(DT_NODELABEL(pdm0));
+    const struct device *const dmic_dev = DEVICE_DT_GET(DT_NODELABEL(pdm0));    
+
 	ret = pwm_config(dmic_dev, NRF_PDM_GAIN_MAXIMUM);
 	if (ret != 0) {
 		LOG_ERR("CONFIG FAILED", dmic_dev->name);
 	}
 
 	//Open SD for read
-	open_wav_for_write(&wav_file, "test_wav.wav");
+	
 
 	//Thread --> Grab Audio
-	record_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
+	//record_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
+
+    while(1) {
+        switch (audio_state){
+            case STATE_IDLE:
+                gpio_pin_set_dt(&led0, 0);
+                k_sleep(K_USEC(100));
+                break;
+            case STATE_RECORDING:
+                gpio_pin_set_dt(&led0, 1);
+                open_wav_for_write(&wav_file, "test_wav.wav");
+                record_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
+        }  
+    }
 
 	LOG_INF("Exiting");
 	return 0;

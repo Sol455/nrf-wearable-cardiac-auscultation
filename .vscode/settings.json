@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "nrfx_i2s.h": "c",
-        "log.h": "c"
+        "log.h": "c",
+        "complex": "c",
+        "cmath": "c"
     }
 }
