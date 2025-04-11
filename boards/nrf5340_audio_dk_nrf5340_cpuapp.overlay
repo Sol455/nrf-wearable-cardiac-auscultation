@@ -63,32 +63,32 @@
 };
 
 
-&i2s0 {
-    status = "okay";
-    compatible = "nordic,nrf-i2s";  
-    pinctrl-0 = <&i2s0_default>;
-	pinctrl-1 = <&i2s0_sleep>;
-    pinctrl-names = "default", "sleep";
-    clock-source = "ACLK";  
-};
+// &i2s0 {
+//     status = "okay";
+//     compatible = "nordic,nrf-i2s";  
+//     pinctrl-0 = <&i2s0_default>;
+// 	pinctrl-1 = <&i2s0_sleep>;
+//     pinctrl-names = "default", "sleep";
+//     clock-source = "ACLK";  
+// };
 
-&pinctrl {
-    i2s0_default: i2s0_default {
-        group1 {
-            psels = <NRF_PSEL(I2S_SCK_M, 1, 14)>, 
-                    <NRF_PSEL(I2S_LRCK_M, 0, 16)>, 
-                    <NRF_PSEL(I2S_SDIN, 0, 13)>;  
-        };
-    };
-    i2s0_sleep: i2s0_sleep {
-        group1 {
-            psels = <NRF_PSEL(I2S_SCK_M, 1, 14)>,  
-                    <NRF_PSEL(I2S_LRCK_M, 0, 16)>,  
-                    <NRF_PSEL(I2S_SDIN, 0, 13)>;  
-        };
-    };
+// &pinctrl {
+//     i2s0_default: i2s0_default {
+//         group1 {
+//             psels = <NRF_PSEL(I2S_SCK_M, 1, 14)>, 
+//                     <NRF_PSEL(I2S_LRCK_M, 0, 16)>, 
+//                     <NRF_PSEL(I2S_SDIN, 0, 13)>;  
+//         };
+//     };
+//     i2s0_sleep: i2s0_sleep {
+//         group1 {
+//             psels = <NRF_PSEL(I2S_SCK_M, 1, 14)>,  
+//                     <NRF_PSEL(I2S_LRCK_M, 0, 16)>,  
+//                     <NRF_PSEL(I2S_SDIN, 0, 13)>;  
+//         };
+//     };
 
-};
+// };
 
 // &clock {
 //     hfclkaudio-frequency = <8192000>;  // 8.192 MHz for 256x ratio
@@ -100,6 +100,20 @@
 
 &clock {
     hfclkaudio-frequency = <12288000>;  // 12.288 MHz
- // 8.192 MHz for 256x ratio
 };
 
+&pinctrl {
+	pdm0_default_alt: pdm0_default_alt {
+		group1 {
+			psels = <NRF_PSEL(PDM_CLK, 0, 24)>,
+				<NRF_PSEL(PDM_DIN, 1, 6)>;
+		};
+	};
+};
+
+dmic_dev: &pdm0 {
+	status = "okay";
+	pinctrl-0 = <&pdm0_default_alt>;
+	pinctrl-names = "default";
+	clock-source = "ACLK";
+};

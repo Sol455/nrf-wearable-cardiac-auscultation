@@ -2,8 +2,9 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 #include "modules/sd_card.h"
-#include <zephyr/drivers/i2s.h>
 #include <zephyr/drivers/gpio.h>
+#include <zephyr/audio/dmic.h>
+#include <nrfx_pdm.h>
 
 #define LED0_NODE DT_ALIAS(led0)
 #define SW0_NODE DT_ALIAS(sw0)
@@ -20,8 +21,8 @@ LOG_MODULE_REGISTER(main);
 
 //Mek slab for I2s Audio Driver
 #define MAX_SAMPLE_RATE  16000
-#define SAMPLE_BIT_WIDTH 32
-#define BYTES_PER_SAMPLE 4
+#define SAMPLE_BIT_WIDTH 16
+#define BYTES_PER_SAMPLE 2
 #define READ_TIMEOUT     1000
 
 #define BLOCK_SIZE(_sample_rate, _number_of_channels) \
@@ -36,7 +37,6 @@ K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 32); //align to 
 void *audio_buffers[BLOCK_COUNT];  // Array to store pointers to each block for initial SD tests
 size_t buffer_sizes[BLOCK_COUNT];
 
-//K_MEM_SLAB_DEFINE_STATIC(mem_slab_2, BLOCK_SIZE, 1, 32);  // Single buffer
 
 void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
@@ -88,61 +88,12 @@ void dump_buffer(void *buf, size_t size) {
     }
 }
 
-int config_i2s_stream(const struct device *i2s_dev) {
-    struct i2s_config i2s_cfg = {
-        .word_size = SAMPLE_BIT_WIDTH,
-        .channels = 2,
-        .format = I2S_FMT_DATA_FORMAT_I2S,
-        .options = I2S_OPT_BIT_CLK_MASTER | I2S_OPT_FRAME_CLK_MASTER,
-        .frame_clk_freq = MAX_SAMPLE_RATE,
-        .mem_slab = &mem_slab,  // Updated reference
-        .block_size = MAX_BLOCK_SIZE,
-        .timeout = 1000
-    };
-
-    int ret = i2s_configure(i2s_dev, I2S_DIR_RX, &i2s_cfg);
-	if (ret < 0) {
-		LOG_WRN("Failed to configure the I2S stream: (%d)\n", ret);
-        return -1;
-    }
-    return 0;
-}
-
-void test_i2s(const struct device *i2s_dev) {
-    void *buffer;
-    size_t size;
-    int ret;
-    uint8_t read_buf[MAX_BLOCK_SIZE]; 
-
-    config_i2s_stream(i2s_dev);
-
-    ret = i2s_trigger(i2s_dev, I2S_DIR_RX, I2S_TRIGGER_START);
-    if (ret < 0) LOG_ERR("Start failed: %d", ret);
-    
-    // Request single sample (but driver may take more)
-    for (int i = 0; i < 10; i++) {
-    ret = i2s_buf_read(i2s_dev, read_buf, &size);
-    if (ret == 0) {
-        // Verify single sample
-        uint32_t sample;
-        memcpy(&sample, buffer, sizeof(uint32_t));
-        LOG_INF("First sample: 0x%08X", sample);
-            
-        // Dump surrounding memory
-        //dump_buffer(read_buf, MAX_BLOCK_SIZE);
-        null_checker(read_buf, size,  1);
-            
-        }
-    }
-}
-
 
 int slab_counter = 0;
 
 void write_wav() {
 
     static struct fs_file_t wav_file;
-
 	fs_file_t_init(&wav_file);
 
 	int ret = sd_card_open_for_write("april10.wav", &wav_file);
@@ -155,27 +106,19 @@ void write_wav() {
 			ret = write_wav_header(
 				&wav_file,
 				slab_counter * MAX_BLOCK_SIZE,
-				//16000, // hard coded header because fs_seek doesn't seem to be working.
-				MAX_SAMPLE_RATE, // bugbug: somehow the lc3 decoded data is
-				// returning twice as much data as expected...?
+				MAX_SAMPLE_RATE, 
 				BYTES_PER_SAMPLE,// bit depth octests
 				1 // 1 channel
 			);
 		}
-
 		if(ret!=0) {
 			LOG_ERR("Failed to write wav header");
 			return 0;
 		}
-
-		//pointer to buffer, data_size...
-		//for block in blocks.....
 		for(int i =0; i < slab_counter; i++) {
 			//LOG_HEXDUMP_INF((uint8_t *)audio_buffers[i], buffer_sizes[i], "Received audio data:");		
 			int ret = write_wav_data(&wav_file, audio_buffers[i], buffer_sizes[i]);
-
 			k_mem_slab_free(&mem_slab, &audio_buffers[i]);
-
 		if (ret != 0) {
 			LOG_ERR("Failed to write to file, rc=%d", ret);
 			return;
@@ -191,71 +134,65 @@ void write_wav() {
 
 }
 
+static int do_pdm_transfer(const struct device *dmic_dev,
+    struct dmic_cfg *cfg,
+    size_t block_count)
+{
+int ret;
+
+LOG_INF("PCM output rate: %u, channels: %u",
+cfg->streams[0].pcm_rate, cfg->channel.req_num_chan);
 
 
-void i2s_loop_infinite_probe(const struct device *i2s_dev, int skip) {
-    void *buffer_pointer;
-    size_t size;
-
-    int buffer_index = skip;
-    int ret;
-
-    while(1) {
-        ret = i2s_read(i2s_dev, &buffer_pointer, &size);
-        if (ret == 0) {
-        null_checker(buffer_pointer, size, buffer_index);
-        print_middle_four_samples(buffer_pointer, size);
-
-        } else {
-            LOG_ERR("%d - read failed: %d", buffer_index, ret);
-        }
-
-        k_mem_slab_free(&mem_slab, &buffer_pointer);
-        buffer_index++;
-    }
-
+ret = dmic_configure(dmic_dev, cfg);
+if (ret < 0) {
+LOG_ERR("Failed to configure the driver: %d", ret);
+return ret;
 }
 
-void i2s_fixed_length_write(const struct device *i2s_dev, int skip) {
-    void *buffer_pointer;
-    size_t size;
-    int ret;
-    int buffer_index = skip;
-    //skip x buffers
-    // while (skip > 0){
-    //     ret = i2s_read(i2s_dev, &buffer_pointer, &size);
-    //     if (ret != 0) {
-    //         LOG_ERR("%d - read failed: %d", slab_counter, ret);
-    //     }
-    //     k_mem_slab_free(&mem_slab, &buffer_pointer);
-    //     skip--;
-    // }
-
-    int available_slabs = k_mem_slab_num_free_get(&mem_slab);
-
-    while(available_slabs > 0 && slab_counter < BLOCK_COUNT) {
-        ret = i2s_read(i2s_dev, &buffer_pointer, &size);
-
-        if (ret == 0) {
-        //null_checker(buffer_pointer, size, buffer_index);
-        //print_middle_four_samples(buffer_pointer, size);
-        } else {
-            LOG_ERR("%d - read failed: %d", slab_counter, ret);
-        }
-        audio_buffers[slab_counter] = buffer_pointer;
-        buffer_sizes[slab_counter] = size;
-        if (available_slabs <= 1) {
-            LOG_HEXDUMP_INF(audio_buffers[slab_counter], MAX_BLOCK_SIZE, "AUDIO DATA p");
-        }
-		available_slabs = k_mem_slab_num_free_get(&mem_slab);
-        buffer_index++;
-	    slab_counter++;
-    }
-
-    LOG_INF("Got here");
-
-    write_wav();
+ret = dmic_trigger(dmic_dev, DMIC_TRIGGER_START);
+if (ret < 0) {
+LOG_ERR("START trigger failed: %d", ret);
+return ret;
 }
+
+int available_slabs = k_mem_slab_num_free_get(&mem_slab);
+
+
+while(available_slabs > 0) {
+void *buffer;
+uint32_t size;
+//LOG_INF("Before read, Memory slab: %d free blocks", k_mem_slab_num_free_get(&mem_slab));
+ret = dmic_read(dmic_dev, 0, &buffer, &size, READ_TIMEOUT);
+//LOG_INF("After read, Memory slab: %d free blocks", k_mem_slab_num_free_get(&mem_slab));
+if (ret < 0) {
+ LOG_ERR("%d - read failed: %d", slab_counter, ret);
+ return ret;
+}
+
+audio_buffers[slab_counter] = buffer;
+buffer_sizes[slab_counter] = size;
+
+LOG_INF("%d - got buffer %p of %u bytes", slab_counter, buffer, size);
+available_slabs = k_mem_slab_num_free_get(&mem_slab);
+slab_counter++;
+
+null_checker(audio_buffers[slab_counter], buffer_sizes[slab_counter], slab_counter);
+
+}
+ret = dmic_trigger(dmic_dev, DMIC_TRIGGER_STOP);
+if (ret < 0) {
+ LOG_ERR("STOP trigger failed: %d", ret);
+ return ret;
+}
+
+LOG_INF("Capture complete. Processing data...");
+
+write_wav();
+
+return ret;
+}
+
 
 int main(void)
 {
@@ -287,29 +224,47 @@ int main(void)
 	if(ret!=0) {
 		LOG_ERR("SD Failed to init");
 	}
+	const struct device *const dmic_dev = DEVICE_DT_GET(DT_NODELABEL(pdm0));
 
-    const struct device *i2s_dev = DEVICE_DT_GET(DT_NODELABEL(i2s0));
-	if (!device_is_ready(i2s_dev)) {
-	    LOG_WRN("%s is not ready\n", i2s_dev->name);
+	if (!device_is_ready(dmic_dev)) {
+		LOG_ERR("%s is not ready", dmic_dev->name);
+		return 0;
 	}
 
-    // config_i2s_stream(i2s_dev);
-    // ret = i2s_trigger(i2s_dev, I2S_DIR_RX, I2S_TRIGGER_START);
-    // if (ret < 0) {
-    //     LOG_WRN("Failed to start the transmission: %d\n", ret);
-    // }
-    test_i2s(i2s_dev);
+	struct pcm_stream_cfg stream = {
+		.pcm_width = SAMPLE_BIT_WIDTH,
+		.mem_slab  = &mem_slab,
+	};
 
-    k_msleep(100);
+	struct dmic_cfg cfg = {
+		.io = {
+			.min_pdm_clk_freq = 1000000,
+			.max_pdm_clk_freq = 3500000,
+			.min_pdm_clk_dc   = 40,
+			.max_pdm_clk_dc   = 60,
+		},
+		.streams = &stream,
+		.channel = {
+			.req_num_streams = 1,
+		},
+	};
+
+	cfg.channel.req_num_chan = 1;
+	cfg.channel.req_chan_map_lo = dmic_build_channel_map(0, 0, PDM_CHAN_LEFT);
+	cfg.streams[0].pcm_rate = MAX_SAMPLE_RATE;
+	cfg.streams[0].block_size = BLOCK_SIZE(cfg.streams[0].pcm_rate, cfg.channel.req_num_chan);
+
+	LOG_INF("block size %i", cfg.streams[0].block_size);
+	LOG_INF("Memory slab: %d free blocks", k_mem_slab_num_free_get(&mem_slab));
 
 
-    //i2s_loop_infinite_probe(i2s_dev, 20);
-    //i2s_fixed_length_write(i2s_dev, 20);
+	ret = do_pdm_transfer(dmic_dev, &cfg, 2 * BLOCK_COUNT);
+	if (ret < 0) {
+		return 0;
+	}
 
-    //Dump the contents of the final buffer
-
-
-    LOG_INF("Exiting");
+	LOG_INF("Exiting");
+	return 0;
 
 }
 
