@@ -29,7 +29,7 @@ LOG_MODULE_REGISTER(main);
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
 
 #define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 2)
-#define BLOCK_COUNT 20
+#define BLOCK_COUNT 8
 #define WAV_LENGTH_BLOCKS 100
 
 K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 4);
@@ -49,6 +49,8 @@ AudioState audio_state = STATE_IDLE;
 uint8_t writing = 0;
 
 K_MSGQ_DEFINE(device_message_queue, sizeof(struct save_wave_msg), 8, 4);
+
+volatile bool debounce_active = false;
 
 
 void null_checker(void *buffer, size_t size, int buffer_index)
@@ -91,13 +93,9 @@ void dump_buffer(void *buf, size_t size) {
 }
 
 void open_wav_for_write(struct fs_file_t *audio_file, char* file_name) { //@to-do add settings in here
-	int ret = sd_card_init();
-	fs_file_t_init(audio_file);
-	if(ret!=0) {
-		LOG_ERR("SD Failed to init");
-	}
+    fs_file_t_init(audio_file);
 
-	ret = sd_card_open_for_write(file_name, audio_file);
+	int ret = sd_card_open_for_write(file_name, audio_file);
 
 		if (ret!= 0) {
 			LOG_ERR("Failed to open file, rc=%d", ret);
@@ -151,7 +149,6 @@ void stop_capture(struct device *dmic_dev, struct fs_file_t *audio_file) {
 			LOG_ERR("STOP trigger failed: %d", ret);
 		}
 		sd_card_close(audio_file);
-        audio_state = STATE_IDLE;
 }
 
 
@@ -249,10 +246,10 @@ int pwm_config(const struct device *dmic_dev, uint8_t gain) {
 
 void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
-    if (audio_state == STATE_IDLE) {
+    if (audio_state == STATE_IDLE && !debounce_active) {
         audio_state = STATE_RECORDING;
+        debounce_active = true;
     }
-    //gpio_pin_toggle_dt(&led0);
 }
 
 void sw1_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
@@ -273,7 +270,6 @@ int main(void)
         LOG_WRN("LED or Button GPIO port not ready!\n");
         return 0;
     }
-
     gpio_pin_configure_dt(&led0, GPIO_OUTPUT);
     gpio_pin_configure_dt(&sw0, GPIO_INPUT);
     gpio_pin_interrupt_configure_dt(&sw0, GPIO_INT_EDGE_TO_ACTIVE);
@@ -294,11 +290,10 @@ int main(void)
 		LOG_ERR("CONFIG FAILED", dmic_dev->name);
 	}
 
-	//Open SD for read
-	
-
-	//Thread --> Grab Audio
-	//record_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
+    ret = sd_card_init();
+	if(ret!=0) {
+		LOG_ERR("SD Failed to init");
+	}
 
     while(1) {
         switch (audio_state){
@@ -307,12 +302,14 @@ int main(void)
                 k_sleep(K_USEC(100));
                 break;
             case STATE_RECORDING:
+                debounce_active = false;
                 gpio_pin_set_dt(&led0, 1);
-                open_wav_for_write(&wav_file, "test_wav.wav");
+                open_wav_for_write(&wav_file, "test_audio.wav");
                 record_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
+                audio_state = STATE_IDLE;
+                break;
         }  
     }
-
 	LOG_INF("Exiting");
 	return 0;
 
