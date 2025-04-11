@@ -304,7 +304,7 @@ int main(void)
             case STATE_RECORDING:
                 debounce_active = false;
                 gpio_pin_set_dt(&led0, 1);
-                open_wav_for_write(&wav_file, "test_audio.wav");
+                open_wav_for_write(&wav_file, "new.wav");
                 record_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
                 audio_state = STATE_IDLE;
                 break;
