@@ -7,27 +7,16 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/audio/dmic.h>
 #include <nrfx_pdm.h>
+#include "macros.h"
 
-#define LED0_NODE DT_ALIAS(led0)
 static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 LOG_MODULE_REGISTER(main);
 
-//Mek slab for I2s Audio Driver
-#define MAX_SAMPLE_RATE  16000
-#define SAMPLE_BIT_WIDTH 16
-#define BYTES_PER_SAMPLE 2
-#define NUM_CHANNELS 1
-#define READ_TIMEOUT     1000
-
-#define BLOCK_SIZE(_sample_rate, _number_of_channels) \
-(BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
-
-#define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 2)
-#define BLOCK_COUNT 8
+#define MEM_SLAB_BLOCK_COUNT 8
 #define WAV_LENGTH_BLOCKS 100
 
-K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, BLOCK_COUNT, 4);
+K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, MEM_SLAB_BLOCK_COUNT, 4); //align mem slab to 4 bytes
 
 struct save_wave_msg {
 	void *buffer;
@@ -95,18 +84,15 @@ int capture_audio(const struct device *dmic_dev, size_t block_count, struct fs_f
 			LOG_ERR("START trigger failed: %d", ret);
 			return ret;
 		}
-	//start recording blocks ---->
+
 	for (int  i = 0; i < block_count; i ++) {
 		ret = dmic_read(dmic_dev, 0, &msg.buffer, &msg.size, READ_TIMEOUT);
 		if (ret < 0) {
 			LOG_ERR("%d - read failed: %d", i, ret);
 			return ret;
 		}
-
 		msg.audio_file = audio_file;
 		LOG_INF("%d - got buffer %p of %u bytes", i, msg.buffer, msg.size);
-		//send message with buffers and pointers here --->
-
 		writing = 1;
 		ret = k_msgq_put(&device_message_queue, &msg, K_NO_WAIT);
 
@@ -114,7 +100,6 @@ int capture_audio(const struct device *dmic_dev, size_t block_count, struct fs_f
     	LOG_ERR("Failed to enqueue message: %d", ret);
     	return ret;
 		}
-		//---> pub sub send---->>
 	}
 
 	while (1) {

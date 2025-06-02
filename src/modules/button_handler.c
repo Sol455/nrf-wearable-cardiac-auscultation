@@ -1,8 +1,6 @@
 #include "button_handler.h"
 #include <zephyr/logging/log.h>
 
-#define SW0_NODE DT_ALIAS(sw0)
-#define SW1_NODE DT_ALIAS(sw1)
 
 LOG_MODULE_REGISTER(button_handler);
 
