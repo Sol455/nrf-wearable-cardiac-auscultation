@@ -2,21 +2,14 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 #include "modules/sd_card.h"
+#include "modules/button_handler.h"
 #include "audio/wav_file.h"
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/audio/dmic.h>
 #include <nrfx_pdm.h>
 
 #define LED0_NODE DT_ALIAS(led0)
-#define SW0_NODE DT_ALIAS(sw0)
-#define SW1_NODE DT_ALIAS(sw1)
-
 static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
-static const struct gpio_dt_spec sw0 = GPIO_DT_SPEC_GET(SW0_NODE, gpios);
-static const struct gpio_dt_spec sw1= GPIO_DT_SPEC_GET(SW1_NODE, gpios);
-
-static struct gpio_callback sw0_cb;
-static struct gpio_callback sw1_cb;
 
 LOG_MODULE_REGISTER(main);
 
@@ -51,9 +44,7 @@ AudioState audio_state = STATE_IDLE;
 uint8_t writing = 0;
 
 K_MSGQ_DEFINE(device_message_queue, sizeof(struct save_wave_msg), 8, 4);
-
 volatile bool debounce_active = false;
-
 
 //Thread 2
 static void process_audio() {
@@ -97,7 +88,6 @@ void stop_capture(struct device *dmic_dev, struct fs_file_t *audio_file) {
 int capture_audio(const struct device *dmic_dev, size_t block_count, struct fs_file_t *audio_file)
 {
 	int ret;
-	int write_counter = 0;
 	struct save_wave_msg msg;
 
 	ret = dmic_trigger(dmic_dev, DMIC_TRIGGER_START);
@@ -106,15 +96,15 @@ int capture_audio(const struct device *dmic_dev, size_t block_count, struct fs_f
 			return ret;
 		}
 	//start recording blocks ---->
-	while(write_counter < block_count) {
+	for (int  i = 0; i < block_count; i ++) {
 		ret = dmic_read(dmic_dev, 0, &msg.buffer, &msg.size, READ_TIMEOUT);
 		if (ret < 0) {
-			LOG_ERR("%d - read failed: %d", write_counter, ret);
+			LOG_ERR("%d - read failed: %d", i, ret);
 			return ret;
 		}
 
 		msg.audio_file = audio_file;
-		LOG_INF("%d - got buffer %p of %u bytes", write_counter, msg.buffer, msg.size);
+		LOG_INF("%d - got buffer %p of %u bytes", i, msg.buffer, msg.size);
 		//send message with buffers and pointers here --->
 
 		writing = 1;
@@ -125,7 +115,6 @@ int capture_audio(const struct device *dmic_dev, size_t block_count, struct fs_f
     	return ret;
 		}
 		//---> pub sub send---->>
-		write_counter++;
 	}
 
 	while (1) {
@@ -201,50 +190,34 @@ void sw1_callback(const struct device *dev, struct gpio_callback *cb, uint32_t p
 int main(void)
 {
     int ret;
+	LOG_INF("Turning on");
 
-    LOG_INF("Turning on");
+	ret = init_buttons(sw0_callback, sw1_callback);
     ret = device_is_ready(led0.port);
-    ret = device_is_ready(sw0.port);
-    ret = device_is_ready(sw1.port);
-    if (!ret) {
-        LOG_WRN("LED or Button GPIO port not ready!\n");
-        return 0;
-    }
-    gpio_pin_configure_dt(&led0, GPIO_OUTPUT);
-    gpio_pin_configure_dt(&sw0, GPIO_INPUT);
-    gpio_pin_interrupt_configure_dt(&sw0, GPIO_INT_EDGE_TO_ACTIVE);
-    gpio_init_callback(&sw0_cb, sw0_callback, BIT(sw0.pin));
-    gpio_add_callback(sw0.port, &sw0_cb);
-    gpio_pin_configure_dt(&sw1, GPIO_INPUT);
-    gpio_pin_interrupt_configure_dt(&sw1, GPIO_INT_EDGE_TO_ACTIVE);
-    gpio_init_callback(&sw1_cb, sw1_callback, BIT(sw1.pin));
-    gpio_add_callback(sw1.port, &sw1_cb);
-
+	gpio_pin_configure_dt(&led0, GPIO_OUTPUT);
+	if(ret!=0) LOG_ERR("Buttons and LEDs failed to init");
     LOG_INF("Configured Buttons & Interrupts");
+
+
     LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
 
     const struct device *const dmic_dev = DEVICE_DT_GET(DT_NODELABEL(pdm0));    
-
 	ret = pwm_config(dmic_dev, NRF_PDM_GAIN_MAXIMUM);
-	if (ret != 0) {
-		LOG_ERR("CONFIG FAILED", dmic_dev->name);
-	}
-
+	if (ret != 0) LOG_ERR("CONFIG FAILED", dmic_dev->name);
+	
     ret = sd_card_init();
-	if(ret!=0) {
-		LOG_ERR("SD Failed to init");
-	}
-
-	//k_sem_init(&write_done, 0, 1);
+	if(ret!=0) LOG_ERR("SD Failed to init");
 	
 	static struct fs_file_t wav_file;
-	WavConfig wav_config;
-	wav_config.wav_file = &wav_file;
-	wav_config.file_name = "april.wav";
-	wav_config.length = WAV_LENGTH_BLOCKS * 3200;
-	wav_config.sample_rate = MAX_SAMPLE_RATE;
-	wav_config.bytes_per_sample = BYTES_PER_SAMPLE;
-	wav_config.num_channels = NUM_CHANNELS;
+
+	WavConfig wav_config = {
+			.wav_file = &wav_file,
+			.file_name = "test_file.wav",
+			.length = WAV_LENGTH_BLOCKS * 3200,
+			.sample_rate = MAX_SAMPLE_RATE,
+			.bytes_per_sample = BYTES_PER_SAMPLE,
+			.num_channels = NUM_CHANNELS,
+	};
 
     while(1) {
         switch (audio_state){
