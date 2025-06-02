@@ -2,6 +2,7 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
 #include "modules/sd_card.h"
+#include "audio/wav_file.h"
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/audio/dmic.h>
 #include <nrfx_pdm.h>
@@ -23,6 +24,7 @@ LOG_MODULE_REGISTER(main);
 #define MAX_SAMPLE_RATE  16000
 #define SAMPLE_BIT_WIDTH 16
 #define BYTES_PER_SAMPLE 2
+#define NUM_CHANNELS 1
 #define READ_TIMEOUT     1000
 
 #define BLOCK_SIZE(_sample_rate, _number_of_channels) \
@@ -53,30 +55,8 @@ K_MSGQ_DEFINE(device_message_queue, sizeof(struct save_wave_msg), 8, 4);
 volatile bool debounce_active = false;
 
 
-void open_wav_for_write(struct fs_file_t *audio_file, char* file_name) { //@to-do add settings in here
-    fs_file_t_init(audio_file);
-
-	int ret = sd_card_open_for_write(file_name, audio_file);
-
-		if (ret!= 0) {
-			LOG_ERR("Failed to open file, rc=%d", ret);
-			} else {
-			LOG_INF("Opened SD card sucessfully");
-			ret = write_wav_header(
-				audio_file,
-				WAV_LENGTH_BLOCKS * 3200, //@TO-DO remove global variable // record length 
-				MAX_SAMPLE_RATE, 
-				BYTES_PER_SAMPLE,// bit depth octests
-				1 // 1 channel
-			);
-		}
-
-    LOG_INF("fixed this!");
-
-}
-
 //Thread 2
-static void write_audio_blocks() {
+static void process_audio() {
 		//wait for process message
 		struct save_wave_msg msg;
 
@@ -114,7 +94,7 @@ void stop_capture(struct device *dmic_dev, struct fs_file_t *audio_file) {
 
 
 //main thread
-int record_audio(const struct device *dmic_dev, size_t block_count, struct fs_file_t *audio_file)
+int capture_audio(const struct device *dmic_dev, size_t block_count, struct fs_file_t *audio_file)
 {
 	int ret;
 	int write_counter = 0;
@@ -157,7 +137,7 @@ int record_audio(const struct device *dmic_dev, size_t block_count, struct fs_fi
 		}
 	}
 
-	LOG_INF("Recording finished");
+	LOG_INF("Audio Capture Finished");
 
 	return ret;
 }
@@ -221,7 +201,6 @@ void sw1_callback(const struct device *dev, struct gpio_callback *cb, uint32_t p
 int main(void)
 {
     int ret;
-    static struct fs_file_t wav_file;
 
     LOG_INF("Turning on");
     ret = device_is_ready(led0.port);
@@ -256,6 +235,17 @@ int main(void)
 		LOG_ERR("SD Failed to init");
 	}
 
+	//k_sem_init(&write_done, 0, 1);
+	
+	static struct fs_file_t wav_file;
+	WavConfig wav_config;
+	wav_config.wav_file = &wav_file;
+	wav_config.file_name = "april.wav";
+	wav_config.length = WAV_LENGTH_BLOCKS * 3200;
+	wav_config.sample_rate = MAX_SAMPLE_RATE;
+	wav_config.bytes_per_sample = BYTES_PER_SAMPLE;
+	wav_config.num_channels = NUM_CHANNELS;
+
     while(1) {
         switch (audio_state){
             case STATE_IDLE:
@@ -265,8 +255,8 @@ int main(void)
             case STATE_RECORDING:
                 debounce_active = false;
                 gpio_pin_set_dt(&led0, 1);
-                open_wav_for_write(&wav_file, "may.wav");
-                record_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
+                ret = open_wav_for_write(&wav_config);
+                capture_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
                 audio_state = STATE_IDLE;
                 break;
         }  
@@ -276,4 +266,4 @@ int main(void)
 
 }
 
-K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, write_audio_blocks, NULL, NULL, NULL, 3, 0, 0);
+K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, process_audio, NULL, NULL, NULL, 3, 0, 0);
