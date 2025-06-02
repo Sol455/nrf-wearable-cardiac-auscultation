@@ -11,6 +11,7 @@
 #define BYTES_PER_SAMPLE 2
 #define NUM_CHANNELS 1
 #define READ_TIMEOUT 1000
+#define WAV_LENGTH_BLOCKS 100
 
 #define BLOCK_SIZE(_sample_rate, _number_of_channels) \
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
