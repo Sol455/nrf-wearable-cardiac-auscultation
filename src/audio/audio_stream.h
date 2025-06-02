@@ -2,12 +2,18 @@
 #define _AUDIO_STREAM_H
 
 #include <zephyr/kernel.h>
+#include <zephyr/audio/dmic.h>
+#include "wav_file.h"
+#include <nrfx_pdm.h>
+#include "../macros.h"
 
 typedef struct {
-    const struct device *dmic_dev;
-    struct fs_file_t *audio_file;
-    struct k_sem write_complete;
-    size_t total_blocks;
-} AudioSession;
+    WavConfig wav_config;
+    const struct device *const dmic_ctx;
+    struct k_mem_slab *mem_slab; 
+    nrf_pdm_gain_t pdm_gain;
+} AudioStream;
+
+int pdm_config(AudioStream * audio_stream);
 
 #endif

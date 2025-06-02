@@ -4,9 +4,9 @@
 #include "modules/sd_card.h"
 #include "modules/button_handler.h"
 #include "audio/wav_file.h"
+#include "audio/audio_stream.h"
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/audio/dmic.h>
-#include <nrfx_pdm.h>
 #include "macros.h"
 
 static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
@@ -72,26 +72,25 @@ void stop_capture(struct device *dmic_dev, struct fs_file_t *audio_file) {
 		sd_card_close(audio_file);
 }
 
-
 //main thread
-int capture_audio(const struct device *dmic_dev, size_t block_count, struct fs_file_t *audio_file)
+int capture_audio(AudioStream *audio_stream)
 {
 	int ret;
 	struct save_wave_msg msg;
 
-	ret = dmic_trigger(dmic_dev, DMIC_TRIGGER_START);
+	ret = dmic_trigger(audio_stream->dmic_ctx, DMIC_TRIGGER_START);
 		if (ret < 0) {
 			LOG_ERR("START trigger failed: %d", ret);
 			return ret;
 		}
 
-	for (int  i = 0; i < block_count; i ++) {
-		ret = dmic_read(dmic_dev, 0, &msg.buffer, &msg.size, READ_TIMEOUT);
+	for (int  i = 0; i < WAV_LENGTH_BLOCKS; i ++) {
+		ret = dmic_read(audio_stream->dmic_ctx, 0, &msg.buffer, &msg.size, READ_TIMEOUT);
 		if (ret < 0) {
 			LOG_ERR("%d - read failed: %d", i, ret);
 			return ret;
 		}
-		msg.audio_file = audio_file;
+		msg.audio_file = audio_stream->wav_config.wav_file;
 		LOG_INF("%d - got buffer %p of %u bytes", i, msg.buffer, msg.size);
 		writing = 1;
 		ret = k_msgq_put(&device_message_queue, &msg, K_NO_WAIT);
@@ -104,7 +103,7 @@ int capture_audio(const struct device *dmic_dev, size_t block_count, struct fs_f
 
 	while (1) {
 		if (writing == 0){
-			stop_capture(dmic_dev, audio_file);
+			stop_capture(audio_stream->dmic_ctx, audio_stream->wav_config.wav_file);
 			break;
 		} else  {
 			k_sleep(K_MSEC(100));
@@ -114,49 +113,6 @@ int capture_audio(const struct device *dmic_dev, size_t block_count, struct fs_f
 	LOG_INF("Audio Capture Finished");
 
 	return ret;
-}
-
-int pwm_config(const struct device *dmic_dev, uint8_t gain) {
-
-		if (!device_is_ready(dmic_dev)) {
-			LOG_ERR("%s is not ready", dmic_dev->name);
-			return 0;
-		}
-
-		struct pcm_stream_cfg stream = {
-			.pcm_width = SAMPLE_BIT_WIDTH,
-			.mem_slab  = &mem_slab,
-		};
-
-		struct dmic_cfg cfg = {
-			.io = {
-				.min_pdm_clk_freq = 1000000,
-				.max_pdm_clk_freq = 3500000,
-				.min_pdm_clk_dc   = 40,
-				.max_pdm_clk_dc   = 60,
-			},
-			.streams = &stream,
-			.channel = {
-				.req_num_streams = 1,
-			},
-		};
-
-		cfg.channel.req_num_chan = 1;
-		cfg.channel.req_chan_map_lo =
-			dmic_build_channel_map(0, 0, PDM_CHAN_LEFT);
-		cfg.streams[0].pcm_rate = MAX_SAMPLE_RATE;
-		cfg.streams[0].block_size = BLOCK_SIZE(cfg.streams[0].pcm_rate, cfg.channel.req_num_chan);
-
-		int ret = dmic_configure(dmic_dev, &cfg);
-		if (ret < 0) {
-			LOG_ERR("Failed to configure the driver: %d", ret);
-			return ret;
-		}
-		nrf_pdm_gain_set(NRF_PDM0_S, gain, gain);
-		uint8_t l_gain, r_gain;
-		nrf_pdm_gain_get(NRF_PDM0_S, &l_gain, &r_gain);
-		LOG_INF("LEFT GAIN: %d, RIGHT GAIN: %d", l_gain, r_gain);
-		return 0;
 }
 
 void sw0_callback(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
@@ -178,31 +134,40 @@ int main(void)
 	LOG_INF("Turning on");
 
 	ret = init_buttons(sw0_callback, sw1_callback);
+	if(ret!=0) LOG_ERR("Buttons failed to init");
+
     ret = device_is_ready(led0.port);
 	gpio_pin_configure_dt(&led0, GPIO_OUTPUT);
-	if(ret!=0) LOG_ERR("Buttons and LEDs failed to init");
+	if(ret!=0) LOG_ERR("LEDs failed to init");
     LOG_INF("Configured Buttons & Interrupts");
 
 
-    LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
-
-    const struct device *const dmic_dev = DEVICE_DT_GET(DT_NODELABEL(pdm0));    
-	ret = pwm_config(dmic_dev, NRF_PDM_GAIN_MAXIMUM);
-	if (ret != 0) LOG_ERR("CONFIG FAILED", dmic_dev->name);
-	
-    ret = sd_card_init();
-	if(ret!=0) LOG_ERR("SD Failed to init");
-	
 	static struct fs_file_t wav_file;
 
 	WavConfig wav_config = {
 			.wav_file = &wav_file,
-			.file_name = "test_file.wav",
+			.file_name = "testfile.wav",
 			.length = WAV_LENGTH_BLOCKS * 3200,
 			.sample_rate = MAX_SAMPLE_RATE,
 			.bytes_per_sample = BYTES_PER_SAMPLE,
 			.num_channels = NUM_CHANNELS,
 	};
+
+	AudioStream audio_stream = {
+		.wav_config = wav_config,
+		.dmic_ctx = DEVICE_DT_GET(DT_NODELABEL(pdm0)),
+		.mem_slab = &mem_slab,
+		.pdm_gain = NRF_PDM_GAIN_MAXIMUM
+	};
+
+    LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
+
+	ret = pdm_config(&audio_stream);
+	if (ret != 0) LOG_ERR("pdm config failed", audio_stream.dmic_ctx->name);
+	
+    ret = sd_card_init();
+	if(ret!=0) LOG_ERR("SD Failed to init");
+	
 
     while(1) {
         switch (audio_state){
@@ -214,7 +179,7 @@ int main(void)
                 debounce_active = false;
                 gpio_pin_set_dt(&led0, 1);
                 ret = open_wav_for_write(&wav_config);
-                capture_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
+                capture_audio(&audio_stream);
                 audio_state = STATE_IDLE;
                 break;
         }  
