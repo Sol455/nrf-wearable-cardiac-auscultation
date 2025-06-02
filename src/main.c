@@ -53,45 +53,6 @@ K_MSGQ_DEFINE(device_message_queue, sizeof(struct save_wave_msg), 8, 4);
 volatile bool debounce_active = false;
 
 
-void null_checker(void *buffer, size_t size, int buffer_index)
-{
-    uint32_t *samples = (uint32_t *)buffer;
-    int num_samples = size / sizeof(uint32_t);
-    int not_valid_count = 0;
-
-    for (int i = 0; i < num_samples; i++) {
-        if (samples[i] != 0xFFFFFFFF) {
-            LOG_INF("Valid sample found at buffer index %d, index %d: 0x%08X", buffer_index, i, samples[i]);
-        } else {
-            not_valid_count++;
-        }
-    }
-    LOG_INF("%d invalid samples found for buffer: %d", not_valid_count, buffer_index);
-}
-
-void print_middle_four_samples(void *buffer, size_t size)
-{
-    uint32_t *samples = (uint32_t *)buffer;
-    int total_samples = size / sizeof(uint32_t);
-    int start = total_samples / 2;
-
-    for (int i = 0; i < 4 && (start + i) < total_samples; i++) {
-        uint32_t raw = samples[start + i];
-        int32_t shifted = ((int32_t)raw) >> 12;  // Use top 20 bits
-        LOG_INF("Sample[%d] = raw: 0x%08X, shifted: %d", start + i, raw, shifted);
-    }
-}
-
-void dump_buffer(void *buf, size_t size) {
-    uint32_t *samples = (uint32_t *)buf;
-    int num_samples = size / sizeof(uint32_t);
-    
-    LOG_INF("First 1000 samples:");
-    for (int i = 0; i < 1000 && i < num_samples; i++) {
-        LOG_INF("[%d] 0x%08X", i, samples[i]);
-    }
-}
-
 void open_wav_for_write(struct fs_file_t *audio_file, char* file_name) { //@to-do add settings in here
     fs_file_t_init(audio_file);
 
@@ -304,7 +265,7 @@ int main(void)
             case STATE_RECORDING:
                 debounce_active = false;
                 gpio_pin_set_dt(&led0, 1);
-                open_wav_for_write(&wav_file, "new.wav");
+                open_wav_for_write(&wav_file, "may.wav");
                 record_audio(dmic_dev, WAV_LENGTH_BLOCKS, &wav_file);
                 audio_state = STATE_IDLE;
                 break;
