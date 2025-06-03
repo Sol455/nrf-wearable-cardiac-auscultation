@@ -8,16 +8,16 @@
 
 # menu "Modules"
 
-# config BUTTON_DEBOUNCE_MS
-# 	int "Button debounce time in ms"
-# 	default 50
+# # config BUTTON_DEBOUNCE_MS
+# # 	int "Button debounce time in ms"
+# # 	default 50
 
 # config AUDIO_SYNC_TIMER_USES_RTC
 # 	bool
-# 	default !BT_LL_ACS_NRF53
+# 	default y
 # 	select NRFX_RTC0
 
-# #----------------------------------------------------------------------------#
+#----------------------------------------------------------------------------#
 # menu "Power measurement"
 
 # config POWER_MEAS_INTERVAL_MS
@@ -38,7 +38,7 @@
 
 # endmenu # Power measurement
 
-# #----------------------------------------------------------------------------#
+#----------------------------------------------------------------------------#
 # menu "I2S"
 
 # config I2S_LRCK_FREQ_HZ
@@ -58,7 +58,7 @@
 
 # endmenu # I2S
 
-# #----------------------------------------------------------------------------#
+#----------------------------------------------------------------------------#
 # menu "Log levels"
 
 # module = MODULE_AUDIO_USB
@@ -91,7 +91,7 @@
 
 # endmenu # Log levels
 
-# #----------------------------------------------------------------------------#
+#----------------------------------------------------------------------------#
 # menu "Thread priorities"
 
 # config POWER_MEAS_THREAD_PRIO
@@ -116,7 +116,7 @@
 
 # endmenu # Thread priorities
 
-# #----------------------------------------------------------------------------#
+#----------------------------------------------------------------------------#
 # menu "Stack sizes"
 
 # config POWER_MEAS_STACK_SIZE
@@ -133,7 +133,7 @@
 
 # endmenu # Stack sizes
 
-# #----------------------------------------------------------------------------#
+#----------------------------------------------------------------------------#
 # menu "Zbus"
 
 # config VOLUME_MSG_SUB_QUEUE_SIZE
@@ -142,7 +142,7 @@
 
 # endmenu # Zbus
 
-# #----------------------------------------------------------------------------#
+#----------------------------------------------------------------------------#
 # menuconfig SD_CARD_PLAYBACK
 # 	bool "Enable playback from SD card"
 # 	select EXPERIMENTAL

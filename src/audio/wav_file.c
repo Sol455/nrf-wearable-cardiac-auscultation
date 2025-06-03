@@ -9,10 +9,6 @@
 #include "wav_file.h"
 
 LOG_MODULE_REGISTER(audio_wavfile);
-//1. SD_card open for write
-//2. write wav header
-//3. write wave data
-//4. SD card close
 
 int write_wav_header(struct fs_file_t *wav_file, uint32_t size, uint16_t sample_rate,
 		     uint16_t bytes_per_sample, uint16_t num_channels)
@@ -78,4 +74,24 @@ int write_wav_data(struct fs_file_t *wav_file, const char *buffer, uint32_t size
 		return ret;
 	}
 	return 0;
+}
+int open_wav_for_write(WavConfig *wav_config) { 
+
+    fs_file_t_init(wav_config->wav_file);
+	int ret = sd_card_open_for_write(wav_config->file_name, wav_config->wav_file);
+
+		if (ret!= 0) {
+			LOG_ERR("Failed to open file, rc=%d", ret);
+			return -1;
+			} else {
+			LOG_INF("Opened SD card sucessfully");
+			ret = write_wav_header(
+				wav_config->wav_file,
+				wav_config->length,//WAV_LENGTH_BLOCKS * 3200, //@TO-DO remove global variable // record length 
+				wav_config->sample_rate, 
+				wav_config->bytes_per_sample,// bit depth octests
+				wav_config->num_channels // 1 channel
+			);
+			return 0;
+		}
 }

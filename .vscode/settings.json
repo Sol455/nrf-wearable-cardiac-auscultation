@@ -1,0 +1,17 @@
+{
+    "files.associations": {
+        "nrfx_i2s.h": "c",
+        "log.h": "c",
+        "complex": "c",
+        "cmath": "c",
+        "gpio.h": "c",
+        "button_handler.h": "c",
+        "kernel.h": "c",
+        "wav_file.h": "c",
+        "dmic.h": "c",
+        "macros.h": "c",
+        "typeinfo": "c",
+        "sd_card.h": "c",
+        "audio_stream.h": "c"
+    }
+}

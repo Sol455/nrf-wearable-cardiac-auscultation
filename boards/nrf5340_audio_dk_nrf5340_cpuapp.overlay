@@ -48,7 +48,7 @@
             label = "SD";  
         };
 
-        spi-max-frequency = <8000000>;
+        spi-max-frequency = <1000000>;
     };
 };
 
@@ -60,4 +60,26 @@
                     <NRF_PSEL(SPIM_MISO, 0, 10)>;
         };
     };
+};
+
+
+
+&clock {
+    hfclkaudio-frequency = <12288000>;  // 12.288 MHz
+};
+
+&pinctrl {
+	pdm0_default_alt: pdm0_default_alt {
+		group1 {
+			psels = <NRF_PSEL(PDM_CLK, 1, 6)>,
+				<NRF_PSEL(PDM_DIN, 0, 24)>;
+		};
+	};
+};
+
+dmic_dev: &pdm0 {
+	status = "okay";
+	pinctrl-0 = <&pdm0_default_alt>;
+	pinctrl-names = "default";
+	clock-source = "ACLK";
 };
