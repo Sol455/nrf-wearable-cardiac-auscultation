@@ -16,7 +16,7 @@
 #define BLOCK_SIZE(_sample_rate, _number_of_channels) \
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
 
-#define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, 2)
+#define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, NUM_CHANNELS)
 
 
 #endif

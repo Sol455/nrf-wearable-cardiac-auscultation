@@ -53,7 +53,7 @@ int main(void)
 	WavConfig wav_config = {
 			.wav_file = &wav_file,
 			.file_name = "testfile.wav",
-			.length = WAV_LENGTH_BLOCKS * 3200,
+			.length = WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE,
 			.sample_rate = MAX_SAMPLE_RATE,
 			.bytes_per_sample = BYTES_PER_SAMPLE,
 			.num_channels = NUM_CHANNELS,
