@@ -12,6 +12,7 @@
         "macros.h": "c",
         "typeinfo": "c",
         "sd_card.h": "c",
-        "audio_stream.h": "c"
+        "audio_stream.h": "c",
+        "led_controller.h": "c"
     }
 }

@@ -1,6 +1,8 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/logging/log.h>
+#include "modules/button_handler.h"
+#include "modules/led_controller.h"
 #include "modules/sd_card.h"
 #include "audio/wav_file.h"
 #include "audio/audio_stream.h"
@@ -56,6 +58,5 @@ int main(void)
 
     LOG_INF("Entering main event loop…");
     event_handler_run();
-
 }
 
