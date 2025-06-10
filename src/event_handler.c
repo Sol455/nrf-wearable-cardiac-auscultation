@@ -1,7 +1,7 @@
 #include "event_handler.h"
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include "audio/audio_stream.h"
+#include "modules/led_controller.h"
 
 LOG_MODULE_REGISTER(event_handler);
 
@@ -16,6 +16,11 @@ typedef enum {
 } AppState;
 
 static AppState app_state = STATE_IDLE;
+static AudioStream *audio_stream_ptr = NULL;
+
+void event_handler_set_audio_stream(AudioStream *audio_stream) {
+    audio_stream_ptr = audio_stream;
+}
 
 void event_handler_post(AppEvent evt)
 {
@@ -26,37 +31,44 @@ void event_handler_post(AppEvent evt)
 static void handle_event(AppEvent evt)
 {
     switch (app_state) {
-    case STATE_IDLE:
-        if (evt == EVENT_BUTTON_PRESS) {
-            ble_start_advertising();
-            led_set_mode(LED_BLINK);
-            app_state = STATE_ADVERTISING;
-        }
-        break;
+        case STATE_IDLE:
+            led_controller_start_blinking(K_MSEC(500));
+            if (evt.type == EVENT_BUTTON_0_PRESS && audio_stream_ptr != NULL) {
+                led_controller_stop_blinking();
+                led_controller_on();
+                int ret = open_wav_for_write(&audio_stream_ptr->wav_config);
+                capture_audio(audio_stream_ptr);
+                led_controller_off();
+                //ble_start_advertising();
+                app_state = STATE_STREAMING;
+            }
+            break;
 
-    case STATE_ADVERTISING:
-        if (evt == EVENT_BLE_CONNECTED) {
-            led_set_mode(LED_OFF);
-            app_state = STATE_CONNECTED;
-        }
-        break;
+        // case STATE_ADVERTISING:
+        //     if (evt == EVENT_BLE_CONNECTED) {
+        //         //led_set_mode(LED_OFF);
+        //         app_state = STATE_CONNECTED;
+        //     }
+        //     break;
 
-    case STATE_CONNECTED:
-        if (evt == EVENT_BUTTON_PRESS || evt == EVENT_BLE_START_STREAMING) {
-            audio_start_streaming();
-            led_set_mode(LED_ON);
-            app_state = STATE_STREAMING;
-        }
-        break;
+        // case STATE_CONNECTED:
+        //     if (evt == EVENT_BUTTON_PRESS || evt == EVENT_BLE_START_STREAMING) {
+        //         //audio_start_streaming();
+        //         //led_set_mode(LED_ON);
+        //         app_state = STATE_STREAMING;
+        //     }
+        //     break;
 
-    case STATE_STREAMING:
-        if (evt == EVENT_AUDIO_FINISHED || evt == EVENT_BLE_STOP_STREAMING) {
-            audio_stop();
-            led_set_mode(LED_OFF);
-            app_state = STATE_CONNECTED;
+        case STATE_STREAMING:
+            // if (evt.type == EVENT_AUDIO_FINISHED) {
+            //     //audio_stop();
+            //     //led_set_mode(LED_OFF);
+            //     app_state = STATE_CONNECTED;
+            // }
+            led_controller_start_blinking(K_MSEC(500));
+            app_state = STATE_IDLE;
+            break;
         }
-        break;
-    }
 }
 
 int event_handler_run(void)
