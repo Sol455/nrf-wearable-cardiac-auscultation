@@ -81,19 +81,28 @@ static void handle_event(AppEvent evt)
             break;
 
         case STATE_CONNECTED:
+            //Send Dummy BLE Data
             if (evt.type == EVENT_BUTTON_0_PRESS) {
                 _send_demo_heartbeat_packet();
-                //app_state = STATE_STREAMING;
-            }
-            if (evt.type == EVENT_BUTTON_1_PRESS) {
                 ret = bt_heart_service_notify_alert(0x02);
                 if(ret!=0) LOG_ERR("Alert Failed to send");
-                //app_state = STATE_STREAMING;
             }
-            if (evt.type = EVENT_BLE_TOGGLE_LED) {
-                bool state = *(bool *)(evt.data);
-                led_controller_set(state);
+            //Record Audio to SD Card
+            if (evt.type == EVENT_BUTTON_1_PRESS) {
+                led_controller_start_blinking(K_MSEC(150));
+                ret = open_wav_for_write(&audio_stream_ptr->wav_config);
+                capture_audio(audio_stream_ptr);
+                led_controller_stop_blinking();
+                led_controller_on();
             }
+            // if (evt.type = EVENT_BLE_DISCONNECTED) {
+            //     app_state = STATE_IDLE;
+            //     led_controller_off();
+            // }
+            // if (evt.type = EVENT_BLE_TOGGLE_LED) {
+            //     bool state = *(bool *)(evt.data);
+            //     led_controller_set(state);
+            // }
             break;
 
         case STATE_STREAMING:
