@@ -225,6 +225,7 @@
 
     const SERVICE_UUID = '09bd3e92-235b-4a5b-b00c-bd50e1749a44';
     const HEART_CHAR_UUID = '24ca214a-c44b-40d6-80d0-2a4e7b0ef0e3';
+    const ALERT_CHAR_UUID = '359502d4-f343-48ce-97d9-d78fc37d69ee';
 
     async function connectBLE() {
       try {
@@ -244,10 +245,14 @@
         bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
 
         const service = await bleServer.getPrimaryService(SERVICE_UUID);
-        const heartChar = await service.getCharacteristic(HEART_CHAR_UUID);
 
+        const heartChar = await service.getCharacteristic(HEART_CHAR_UUID);
         await heartChar.startNotifications();
         heartChar.addEventListener('characteristicvaluechanged', handleHeartPacket);
+
+        const alertChar = await service.getCharacteristic(ALERT_CHAR_UUID);
+        await alertChar.startNotifications();
+        alertChar.addEventListener('characteristicvaluechanged', handleAlertNotification);
 
         console.log('Notification listener attached to heartChar');
 
@@ -291,6 +296,22 @@
       centroidChart.update();
 
       updateStatus(`RMS: ${rms.toFixed(1)}, Centroid: ${centroid.toFixed(1)} Hz`, false);
+    }
+    
+    function handleAlertNotification(event) {
+      const dv = event.target.value;
+      const alertCode = dv.getUint8(0);
+
+      let alertMsg = '';
+      if (alertCode === 1) {
+        alertMsg = 'RMS Alert';
+      } else if (alertCode === 2) {
+        alertMsg = 'Centroid Alert';
+      } else {
+        alertMsg = 'Status: Normal';
+      }
+
+      updateStatus(alertMsg, alertCode !== 0);
     }
   </script>
 </body>
