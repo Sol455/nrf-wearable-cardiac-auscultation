@@ -15,24 +15,16 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 
-#include <bluetooth/services/lbs.h>
+#include "heart_service.h"
 
 #include <zephyr/settings/settings.h>
 #include <zephyr/logging/log.h>
-#include "led_controller.h"
 #include "../event_handler.h"
 
 #define DEVICE_NAME CONFIG_BT_DEVICE_NAME
 #define DEVICE_NAME_LEN (sizeof(DEVICE_NAME) - 1)
 
 LOG_MODULE_REGISTER(ble);
-static bool app_button_state = false;
-
-void publish_button_state(bool button_state)
-{
-    app_button_state = button_state;
-    bt_lbs_send_button_state(app_button_state);
-}
 
 static const struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -40,7 +32,7 @@ static const struct bt_data ad[] = {
 };
 
 static const struct bt_data sd[] = {
-    BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_LBS_VAL),
+    BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_HEART_SERVICE_VAL),
 };
 
 //========================================Connection Callbacks==============================================
@@ -138,25 +130,6 @@ static struct bt_conn_auth_info_cb conn_auth_info_callbacks = {
     .pairing_complete = pairing_complete,
     .pairing_failed = pairing_failed};
 
-static bool led_state_g;
-
-static void app_led_cb(bool led_state)
-{
-    led_state_g = led_state;
-    AppEvent ev = {.type = EVENT_BLE_TOGGLE_LED, .data = &led_state_g};
-    event_handler_post(ev);
-}
-
-static bool app_button_cb(void)
-{
-    return app_button_state;
-}
-
-static struct bt_lbs_cb lbs_callbacs = {
-    .led_cb = app_led_cb,
-    .button_cb = app_button_cb,
-};
-
 int ble_init()
 {
     int ret;
@@ -166,21 +139,21 @@ int ble_init()
     if (ret)
     {
         LOG_ERR("Failed to register authorization callbacks.\n");
-        return 0;
+        return -1;
     }
 
     ret = bt_conn_auth_info_cb_register(&conn_auth_info_callbacks);
     if (ret)
     {
         LOG_ERR("Failed to register authorization info callbacks.\n");
-        return 0;
+        return -1;
     }
 
     ret = bt_enable(NULL);
     if (ret)
     {
         LOG_ERR("Bluetooth init failed (err %d)\n", ret);
-        return 0;
+        return -1;
     }
 
     LOG_INF("Bluetooth initialized\n");
@@ -190,14 +163,14 @@ int ble_init()
         settings_load();
     }
 
-    ret = bt_lbs_init(&lbs_callbacs);
+    ret = bt_heart_service_init();
     if (ret)
     {
-        LOG_ERR("Failed to init LBS (err:%d)\n", ret);
-        return 0;
+        LOG_ERR("Failed to init Heart Service (err:%d)\n", ret);
+        return -1;
     }
 
-    LOG_INF("LBS sucessfully initialised\n");
+    LOG_INF("Heart Service sucessfully initialised\n");
 
     return ret;
 }

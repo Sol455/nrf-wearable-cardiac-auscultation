@@ -1,5 +1,5 @@
-#ifndef EVENT_HANDLER_H
-#define EVENT_HANDLER_H
+#ifndef EVENT_HANDLER_H_
+#define EVENT_HANDLER_H_
 
 #include "audio/audio_stream.h"
 

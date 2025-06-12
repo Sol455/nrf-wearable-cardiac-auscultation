@@ -17,6 +17,9 @@
         "stdbool.h": "c",
         "event_handler.h": "c",
         "ble_manager.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "lbs.h": "c",
+        "stddef.h": "c",
+        "heart_service.h": "c"
     }
 }

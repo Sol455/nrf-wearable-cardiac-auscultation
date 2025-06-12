@@ -2,7 +2,8 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "modules/led_controller.h"
-#include "modules/ble_manager.h"
+#include "ble/ble_manager.h"
+#include "ble/heart_service.h"
 
 LOG_MODULE_REGISTER(event_handler);
 
@@ -29,8 +30,28 @@ void event_handler_post(AppEvent evt)
     k_sem_give(&_event_sem);
 }
 
+void _send_demo_heartbeat_packet()
+{
+    static float counter = 0.0f;
+    struct heart_packet pkt = {
+        .rms = 0.42f + counter,
+        .centroid = 1234.5f + counter,
+        .timestamp_ms = 5//k_uptime_get_32()
+    };
+
+    counter =  counter + 1.0f;
+
+    int err = bt_heart_service_notify_packet(&pkt);
+    if (err) {
+        printk("Failed to send packet: %d\n", err);
+    } else {
+        printk("Demo heartbeat packet sent!\n");
+    }
+}
+
 static void handle_event(AppEvent evt)
 {
+    int ret;
     switch (app_state) {
         case STATE_IDLE:
             if (evt.type == EVENT_BUTTON_0_PRESS && audio_stream_ptr != NULL) {
@@ -61,9 +82,15 @@ static void handle_event(AppEvent evt)
 
         case STATE_CONNECTED:
             if (evt.type == EVENT_BUTTON_0_PRESS) {
-                publish_button_state(1);
+                _send_demo_heartbeat_packet();
                 //app_state = STATE_STREAMING;
-            } else if (evt.type = EVENT_BLE_TOGGLE_LED) {
+            }
+            if (evt.type == EVENT_BUTTON_1_PRESS) {
+                ret = bt_heart_service_notify_alert(0x02);
+                if(ret!=0) LOG_ERR("Alert Failed to send");
+                //app_state = STATE_STREAMING;
+            }
+            if (evt.type = EVENT_BLE_TOGGLE_LED) {
                 bool state = *(bool *)(evt.data);
                 led_controller_set(state);
             }

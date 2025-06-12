@@ -10,7 +10,7 @@
 #include <zephyr/audio/dmic.h>
 #include "macros.h"
 #include "event_handler.h"
-#include "modules/ble_manager.h"
+#include "ble/ble_manager.h"
 
 LOG_MODULE_REGISTER(main);
 
