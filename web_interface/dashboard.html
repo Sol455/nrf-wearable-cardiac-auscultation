@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+  <link rel="manifest" href="manifest.json">
   <title>Heart Sound Patch Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.3/build/global/luxon.min.js"></script>
@@ -175,8 +176,8 @@
 
     function simulateBeat() {
       const now = new Date();
-      const newRMS = Math.floor(Math.random() * 400 + 100);  // Simulated RMS
-      const newCentroid = Math.floor(Math.random() * 300 + 200);  // Simulated centroid in Hz
+      const newRMS = Math.floor(Math.random() * 400 + 100); // Simulated RMS
+      const newCentroid = Math.floor(Math.random() * 300 + 200); //Simulated centroid in Hz
 
       // Update datasets
       rmsData.push({ x: now, y: newRMS });
@@ -297,7 +298,7 @@
 
       updateStatus(`RMS: ${rms.toFixed(1)}, Centroid: ${centroid.toFixed(1)} Hz`, false);
     }
-    
+
     function handleAlertNotification(event) {
       const dv = event.target.value;
       const alertCode = dv.getUint8(0);
@@ -313,6 +314,11 @@
 
       updateStatus(alertMsg, alertCode !== 0);
     }
+
+    if ('serviceWorker' in navigator) {navigator.serviceWorker.register('sw.js')
+    .then(reg => console.log(' Service worker registered'))
+    .catch(err => console.error(' Service worker failed:', err));
+}
   </script>
 </body>
 
