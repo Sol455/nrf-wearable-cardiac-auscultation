@@ -3,6 +3,9 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(nrf_auscultation)
 
+set(NRF5340_NETWORK_CORE_IMAGE hci_ipc)
+
+
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE src/event_handler.c)
 target_sources(app PRIVATE src/audio/wav_file.c)

@@ -10,6 +10,7 @@
 #include <zephyr/audio/dmic.h>
 #include "macros.h"
 #include "event_handler.h"
+#include "modules/ble_manager.h"
 
 LOG_MODULE_REGISTER(main);
 
@@ -54,7 +55,10 @@ int main(void)
 
     //Start up the application
     AppEvent ev = { .type = EVENT_START_UP};
-    event_handler_post(ev); 
+    event_handler_post(ev);
+	
+	ret = ble_init();
+	if(ret!=0) LOG_ERR("BLE Failed to init");
 
     LOG_INF("Entering main event loop…");
     event_handler_run();

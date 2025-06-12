@@ -32,6 +32,11 @@ int led_controller_init(void)
     return ret;
 }
 
+void led_controller_set(bool state)
+{
+    gpio_pin_set_dt(&led, state);
+}
+
 void led_controller_on(void)
 {
     gpio_pin_set_dt(&led, 1);

@@ -9,6 +9,7 @@ void led_controller_off(void);
 void led_controller_toggle(void);
 void led_controller_start_blinking(k_timeout_t interval);
 void led_controller_stop_blinking(void);
+void led_controller_set(bool state);
 
 #endif
 

@@ -14,6 +14,7 @@ typedef enum {
     EVENT_AUDIO_FINISHED,
     EVENT_BLE_START_STREAMING,
     EVENT_BLE_STOP_STREAMING,
+    EVENT_BLE_TOGGLE_LED
 } AppEventType;
 
 typedef struct {

@@ -2,6 +2,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "modules/led_controller.h"
+#include "modules/ble_manager.h"
 
 LOG_MODULE_REGISTER(event_handler);
 
@@ -32,32 +33,41 @@ static void handle_event(AppEvent evt)
 {
     switch (app_state) {
         case STATE_IDLE:
-            led_controller_start_blinking(K_MSEC(500));
             if (evt.type == EVENT_BUTTON_0_PRESS && audio_stream_ptr != NULL) {
+                led_controller_start_blinking(K_MSEC(500));
+                ble_advertise();
+                app_state = STATE_ADVERTISING;
+            }
+            break;
+            // if (evt.type == EVENT_BUTTON_0_PRESS && audio_stream_ptr != NULL) {
+            //     led_controller_stop_blinking();
+            //     led_controller_on();
+            //     int ret = open_wav_for_write(&audio_stream_ptr->wav_config);
+            //     capture_audio(audio_stream_ptr);
+            //     led_controller_off();
+            //     //ble_start_advertising();
+            //     app_state = STATE_STREAMING;
+            // }
+            // break;
+
+        case STATE_ADVERTISING:
+            if (evt.type == EVENT_BLE_CONNECTED) {
                 led_controller_stop_blinking();
                 led_controller_on();
-                int ret = open_wav_for_write(&audio_stream_ptr->wav_config);
-                capture_audio(audio_stream_ptr);
-                led_controller_off();
-                //ble_start_advertising();
-                app_state = STATE_STREAMING;
+                //led_set_mode(LED_OFF);
+                app_state = STATE_CONNECTED;
             }
             break;
 
-        // case STATE_ADVERTISING:
-        //     if (evt == EVENT_BLE_CONNECTED) {
-        //         //led_set_mode(LED_OFF);
-        //         app_state = STATE_CONNECTED;
-        //     }
-        //     break;
-
-        // case STATE_CONNECTED:
-        //     if (evt == EVENT_BUTTON_PRESS || evt == EVENT_BLE_START_STREAMING) {
-        //         //audio_start_streaming();
-        //         //led_set_mode(LED_ON);
-        //         app_state = STATE_STREAMING;
-        //     }
-        //     break;
+        case STATE_CONNECTED:
+            if (evt.type == EVENT_BUTTON_0_PRESS) {
+                publish_button_state(1);
+                //app_state = STATE_STREAMING;
+            } else if (evt.type = EVENT_BLE_TOGGLE_LED) {
+                bool state = *(bool *)(evt.data);
+                led_controller_set(state);
+            }
+            break;
 
         case STATE_STREAMING:
             // if (evt.type == EVENT_AUDIO_FINISHED) {
