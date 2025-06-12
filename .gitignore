@@ -1,2 +1,3 @@
 build*/
 .vscode/settings.json
+firmware/.vscode/settings.json

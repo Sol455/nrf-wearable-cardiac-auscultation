@@ -51,15 +51,15 @@ int main(void)
     ret = sd_card_init();
 	if(ret!=0) LOG_ERR("SD Failed to init");
 
+	ret = ble_init();
+	if(ret!=0) LOG_ERR("BLE Failed to init");
+
     event_handler_set_audio_stream(&audio_stream);
 
     //Start up the application
     AppEvent ev = { .type = EVENT_START_UP};
     event_handler_post(ev);
 	
-	ret = ble_init();
-	if(ret!=0) LOG_ERR("BLE Failed to init");
-
     LOG_INF("Entering main event loop…");
     event_handler_run();
 }
