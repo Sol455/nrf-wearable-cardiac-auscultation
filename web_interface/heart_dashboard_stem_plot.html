@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Heart Sound Patch Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.3/build/global/luxon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      padding: 2rem;
+      background-color: #f8f9fa;
+    }
+
+    .card {
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+    }
+
+    canvas {
+      max-width: 100%;
+    }
+
+    .status-idle {
+      color: #6c757d;
+    }
+
+    .status-alert {
+      color: #dc3545;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h2 class="mb-4">Heart Sound Patch Dashboard</h2>
+
+      <div class="mb-3">
+        <button class="btn btn-primary me-2" onclick="simulateBeat()">Simulate Beat</button>
+        <button class="btn btn-danger" onclick="toggleAlert()">Toggle Alert</button>
+      </div>
+
+      <p id="status" class="mb-4 status-idle">Status: Idle</p>
+
+      <h5>RMS</h5>
+      <canvas id="rmsChart" height="100"></canvas>
+
+      <h5 class="mt-4">Spectral Centroid</h5>
+      <canvas id="centroidChart" height="100"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const MAX_POINTS = 50;
+    let rmsData = [];
+    let centroidData = [];
+
+    const rmsCtx = document.getElementById('rmsChart').getContext('2d');
+    const centroidCtx = document.getElementById('centroidChart').getContext('2d');
+
+    const rmsChart = new Chart(rmsCtx, {
+      type: 'line',
+      data: {
+        datasets: [
+          {
+            label: 'RMS Stem',
+            data: [],
+            borderColor: '#0d6efd',
+            pointRadius: 0,
+            showLine: true,
+            fill: false
+          },
+          {
+            label: 'RMS Points',
+            data: [],
+            borderColor: 'transparent',
+            backgroundColor: '#0d6efd',
+            pointRadius: 5,
+            type: 'line',
+            showLine: false
+          }
+        ]
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        parsing: {
+          xAxisKey: 'x',
+          yAxisKey: 'y'
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              tooltipFormat: 'HH:mm:ss',
+              displayFormats: { second: 'HH:mm:ss' }
+            },
+            title: { display: true, text: 'Time' }
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'RMS' }
+          }
+        }
+      }
+    });
+
+    const centroidChart = new Chart(centroidCtx, {
+      type: 'line',
+      data: {
+        datasets: [
+          {
+            label: 'Centroid Stem',
+            data: [],
+            borderColor: '#198754',
+            pointRadius: 0,
+            showLine: true,
+            fill: false
+          },
+          {
+            label: 'Centroid Points',
+            data: [],
+            borderColor: 'transparent',
+            backgroundColor: '#198754',
+            pointRadius: 5,
+            type: 'line',
+            showLine: false
+          }
+        ]
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        parsing: {
+          xAxisKey: 'x',
+          yAxisKey: 'y'
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              tooltipFormat: 'HH:mm:ss',
+              displayFormats: { second: 'HH:mm:ss' }
+            },
+            title: { display: true, text: 'Time' }
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Spectral Centroid (Hz)' }
+          }
+        }
+      }
+    });
+
+    function simulateBeat() {
+      const now = new Date();
+      const newRMS = Math.floor(Math.random() * 400 + 100);  // Simulated RMS
+      const newCentroid = Math.floor(Math.random() * 300 + 200);  // Simulated centroid in Hz
+
+      // Update datasets
+      rmsData.push({ x: now, y: newRMS });
+      centroidData.push({ x: now, y: newCentroid });
+
+      if (rmsData.length > MAX_POINTS) rmsData.shift();
+      if (centroidData.length > MAX_POINTS) centroidData.shift();
+
+      const rmsStems = rmsData.flatMap(({ x, y }) => [
+        { x, y: 0 },
+        { x, y },
+        { x: null, y: null }
+      ]);
+
+      const centroidStems = centroidData.flatMap(({ x, y }) => [
+        { x, y: 0 },
+        { x, y },
+        { x: null, y: null }
+      ]);
+
+      rmsChart.data.datasets[0].data = rmsStems;
+      rmsChart.data.datasets[1].data = rmsData;
+      rmsChart.update();
+
+      centroidChart.data.datasets[0].data = centroidStems;
+      centroidChart.data.datasets[1].data = centroidData;
+      centroidChart.update();
+
+      updateStatus(`Simulated RMS: ${newRMS}, Centroid: ${newCentroid} Hz at ${now.toLocaleTimeString()}`, false);
+    }
+
+    let alertOn = false;
+    function toggleAlert() {
+      alertOn = !alertOn;
+      updateStatus(alertOn ? "Alert Active" : "Status: Idle", alertOn);
+    }
+
+    function updateStatus(message, isAlert) {
+      const status = document.getElementById('status');
+      status.innerText = message;
+      status.className = isAlert ? 'status-alert mb-4' : 'status-idle mb-4';
+    }
+  </script>
+</body>
+</html>
