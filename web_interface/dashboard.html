@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Heart Sound Patch Dashboard</title>
@@ -17,7 +18,7 @@
     .card {
       padding: 2rem;
       border-radius: 1rem;
-      box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.1);
+      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
       margin-bottom: 2rem;
     }
 
@@ -35,27 +36,28 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="card">
       <h2 class="mb-4">Heart Sound Patch Dashboard</h2>
-  
+
       <div class="mb-3 d-flex align-items-center flex-wrap gap-2">
         <button class="btn btn-primary" onclick="simulateBeat()">Simulate Beat</button>
         <button class="btn btn-danger" onclick="toggleAlert()">Toggle Alert</button>
         <button class="btn btn-success" onclick="connectBLE()">Try Connect</button>
         <span id="bleStatus" class="text-muted ms-2">Not connected</span>
       </div>
-  
+
       <p id="status" class="mb-4 status-idle">Status: Idle</p>
-  
+
       <div class="mb-4">
         <h5>RMS</h5>
         <div style="height: 250px;">
           <canvas id="rmsChart"></canvas>
         </div>
       </div>
-      
+
       <div class="mb-4">
         <h5>Spectral Centroid</h5>
         <div style="height: 250px;">
@@ -70,6 +72,7 @@
     const MAX_POINTS = 50;
     let rmsData = [];
     let centroidData = [];
+    let connectionStart = null;
 
     const rmsCtx = document.getElementById('rmsChart').getContext('2d');
     const centroidCtx = document.getElementById('centroidChart').getContext('2d');
@@ -218,38 +221,78 @@
     }
 
     let bleDevice = null;
-let bleServer = null;
+    let bleServer = null;
 
-const SERVICE_UUID = '09bd3e92-235b-4a5b-b00c-bd50e1749a44';
+    const SERVICE_UUID = '09bd3e92-235b-4a5b-b00c-bd50e1749a44';
+    const HEART_CHAR_UUID = '24ca214a-c44b-40d6-80d0-2a4e7b0ef0e3';
 
-async function connectBLE() {
-  try {
-    updateBLEStatus('Requesting device...');
+    async function connectBLE() {
+      try {
+        updateBLEStatus('Requesting device...');
 
-    bleDevice = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [SERVICE_UUID] }]
-    });
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }],
+          optionalServices: [SERVICE_UUID]
+        });
 
-    updateBLEStatus('Connecting...');
+        updateBLEStatus('Connecting...');
 
-    bleServer = await bleDevice.gatt.connect();
-    updateBLEStatus(`Connected to ${bleDevice.name || 'device'}`);
+        bleServer = await bleDevice.gatt.connect();
+        updateBLEStatus(`Connected to ${bleDevice.name || 'device'}`);
+        connectionStart = Date.now();
 
-    bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
 
-  } catch (error) {
-    console.error('BLE connection failed:', error);
-    updateBLEStatus('Connection failed');
-  }
-}
+        const service = await bleServer.getPrimaryService(SERVICE_UUID);
+        const heartChar = await service.getCharacteristic(HEART_CHAR_UUID);
 
-function onDisconnected() {
-  updateBLEStatus('Disconnected');
-}
+        await heartChar.startNotifications();
+        heartChar.addEventListener('characteristicvaluechanged', handleHeartPacket);
 
-function updateBLEStatus(message) {
-  document.getElementById('bleStatus').innerText = message;
-}
+        console.log('Notification listener attached to heartChar');
+
+      } catch (error) {
+        console.error('BLE connection failed:', error);
+        updateBLEStatus('Connection failed');
+      }
+    }
+
+    function onDisconnected() {
+      updateBLEStatus('Disconnected');
+    }
+
+    function updateBLEStatus(message) {
+      document.getElementById('bleStatus').innerText = message;
+    }
+
+    function handleHeartPacket(event) {
+      const dv = event.target.value;
+
+      const rms = dv.getFloat32(0, true);
+      const centroid = dv.getFloat32(4, true);
+      const timestampMs = dv.getUint32(8, true);
+
+      const ts = new Date(connectionStart + timestampMs);  // align with browser time
+
+      // Update RMS chart
+      rmsData.push({ x: ts, y: rms });
+      if (rmsData.length > MAX_POINTS) rmsData.shift();
+      const rmsStems = rmsData.flatMap(({ x, y }) => [{ x, y: 0 }, { x, y }, { x: null, y: null }]);
+      rmsChart.data.datasets[0].data = rmsStems;
+      rmsChart.data.datasets[1].data = rmsData;
+      rmsChart.update();
+
+      // Update Centroid chart
+      centroidData.push({ x: ts, y: centroid });
+      if (centroidData.length > MAX_POINTS) centroidData.shift();
+      const centroidStems = centroidData.flatMap(({ x, y }) => [{ x, y: 0 }, { x, y }, { x: null, y: null }]);
+      centroidChart.data.datasets[0].data = centroidStems;
+      centroidChart.data.datasets[1].data = centroidData;
+      centroidChart.update();
+
+      updateStatus(`RMS: ${rms.toFixed(1)}, Centroid: ${centroid.toFixed(1)} Hz`, false);
+    }
   </script>
 </body>
+
 </html>
