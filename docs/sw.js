@@ -1,7 +1,7 @@
 const CACHE_NAME = 'heartpatch-cache-v1';
 const urlsToCache = [
   './',
-  './dashboard.html',
+  './index.html',
   './manifest.json',
   './icon_192.png',
   './icon_512.png',
