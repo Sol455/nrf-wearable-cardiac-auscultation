@@ -34,9 +34,9 @@ void _send_demo_heartbeat_packet()
 {
     static float counter = 0.0f;
     struct heart_packet pkt = {
-        .rms = 0.42f + counter,
-        .centroid = 1234.5f + counter,
-        .timestamp_ms = 5//k_uptime_get_32()
+        .rms = 10.0f + counter,
+        .centroid = 200.0f + counter,
+        .timestamp_ms = k_uptime_get()
     };
 
     counter =  counter + 1.0f;
