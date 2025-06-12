@@ -39,20 +39,31 @@
   <div class="container">
     <div class="card">
       <h2 class="mb-4">Heart Sound Patch Dashboard</h2>
-
-      <div class="mb-3">
-        <button class="btn btn-primary me-2" onclick="simulateBeat()">Simulate Beat</button>
+  
+      <div class="mb-3 d-flex align-items-center flex-wrap gap-2">
+        <button class="btn btn-primary" onclick="simulateBeat()">Simulate Beat</button>
         <button class="btn btn-danger" onclick="toggleAlert()">Toggle Alert</button>
+        <button class="btn btn-success" onclick="connectBLE()">Try Connect</button>
+        <span id="bleStatus" class="text-muted ms-2">Not connected</span>
       </div>
-
+  
       <p id="status" class="mb-4 status-idle">Status: Idle</p>
-
-      <h5>RMS</h5>
-      <canvas id="rmsChart" height="100"></canvas>
-
-      <h5 class="mt-4">Spectral Centroid</h5>
-      <canvas id="centroidChart" height="100"></canvas>
+  
+      <div class="mb-4">
+        <h5>RMS</h5>
+        <div style="height: 250px;">
+          <canvas id="rmsChart"></canvas>
+        </div>
+      </div>
+      
+      <div class="mb-4">
+        <h5>Spectral Centroid</h5>
+        <div style="height: 250px;">
+          <canvas id="centroidChart"></canvas>
+        </div>
+      </div>
     </div>
+  </div>
   </div>
 
   <script>
@@ -89,6 +100,7 @@
       options: {
         animation: false,
         responsive: true,
+        maintainAspectRatio: false,
         parsing: {
           xAxisKey: 'x',
           yAxisKey: 'y'
@@ -135,6 +147,7 @@
       },
       options: {
         animation: false,
+        maintainAspectRatio: false,
         responsive: true,
         parsing: {
           xAxisKey: 'x',
@@ -203,6 +216,40 @@
       status.innerText = message;
       status.className = isAlert ? 'status-alert mb-4' : 'status-idle mb-4';
     }
+
+    let bleDevice = null;
+let bleServer = null;
+
+const SERVICE_UUID = '09bd3e92-235b-4a5b-b00c-bd50e1749a44';
+
+async function connectBLE() {
+  try {
+    updateBLEStatus('Requesting device...');
+
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [SERVICE_UUID] }]
+    });
+
+    updateBLEStatus('Connecting...');
+
+    bleServer = await bleDevice.gatt.connect();
+    updateBLEStatus(`Connected to ${bleDevice.name || 'device'}`);
+
+    bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+  } catch (error) {
+    console.error('BLE connection failed:', error);
+    updateBLEStatus('Connection failed');
+  }
+}
+
+function onDisconnected() {
+  updateBLEStatus('Disconnected');
+}
+
+function updateBLEStatus(message) {
+  document.getElementById('bleStatus').innerText = message;
+}
   </script>
 </body>
 </html>
