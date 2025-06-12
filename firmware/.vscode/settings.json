@@ -12,6 +12,17 @@
         "macros.h": "c",
         "typeinfo": "c",
         "sd_card.h": "c",
-        "audio_stream.h": "c"
-    }
+        "audio_stream.h": "c",
+        "led_controller.h": "c",
+        "stdbool.h": "c",
+        "event_handler.h": "c",
+        "ble_manager.h": "c",
+        "types.h": "c",
+        "lbs.h": "c",
+        "stddef.h": "c",
+        "heart_service.h": "c"
+    },
+    "nrf-connect.applications": [
+        "${workspaceFolder}"
+    ]
 }
