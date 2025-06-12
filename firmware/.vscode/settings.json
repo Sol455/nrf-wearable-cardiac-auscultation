@@ -21,5 +21,8 @@
         "lbs.h": "c",
         "stddef.h": "c",
         "heart_service.h": "c"
-    }
+    },
+    "nrf-connect.applications": [
+        "${workspaceFolder}"
+    ]
 }
