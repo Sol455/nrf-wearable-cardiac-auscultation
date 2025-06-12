@@ -5,6 +5,6 @@
 #include <zephyr/drivers/gpio.h>
 #include "../macros.h"
 
-int button_handler_init(void);
+int init_buttons(gpio_callback_handler_t cb0, gpio_callback_handler_t cb1);
 
 #endif
