@@ -27,4 +27,6 @@ int capture_audio(AudioStream *audio_stream);
 
 void process_audio();
 
+void generate_filename(char *filename_out, size_t max_len);
+
 #endif
