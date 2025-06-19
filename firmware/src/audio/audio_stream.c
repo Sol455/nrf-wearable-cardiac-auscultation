@@ -1,11 +1,12 @@
 #include "audio_stream.h"
 #include <zephyr/logging/log.h>
-
-LOG_MODULE_REGISTER(audio_stream);
-
-K_MSGQ_DEFINE(device_message_queue, sizeof(struct save_wave_msg), 8, 4);
+#include <stdio.h>
 
 #define MEM_SLAB_BLOCK_COUNT 8
+
+LOG_MODULE_REGISTER(audio_stream);
+K_MSGQ_DEFINE(device_message_queue, sizeof(struct save_wave_msg), 8, 4);
+
 
 K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, MEM_SLAB_BLOCK_COUNT, 4); //align mem slab to 4 bytes
 
@@ -129,5 +130,9 @@ LOG_INF("Audio Capture Finished");
 
 return ret;
 }
+
+void generate_filename(char *filename_out, size_t max_len) {
+    static uint32_t file_counter = 0;
+    snprintf(filename_out, max_len, "%08u.wav", file_counter++);}
 
 K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, process_audio, NULL, NULL, NULL, 3, 0, 0);

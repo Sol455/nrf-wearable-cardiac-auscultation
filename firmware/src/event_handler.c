@@ -90,6 +90,9 @@ static void handle_event(AppEvent evt)
             //Record Audio to SD Card
             if (evt.type == EVENT_BUTTON_1_PRESS) {
                 led_controller_start_blinking(K_MSEC(150));
+                static char filename[MAX_FILENAME_LEN];
+                generate_filename(filename, sizeof(filename));
+                audio_stream_ptr->wav_config.file_name = filename;
                 ret = open_wav_for_write(&audio_stream_ptr->wav_config);
                 capture_audio(audio_stream_ptr);
                 led_controller_stop_blinking();
