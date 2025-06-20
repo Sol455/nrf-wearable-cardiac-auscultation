@@ -70,7 +70,6 @@ static void handle_event(AppEvent evt)
             //     app_state = STATE_STREAMING;
             // }
             // break;
-
         case STATE_ADVERTISING:
             if (evt.type == EVENT_BLE_CONNECTED) {
                 led_controller_stop_blinking();
@@ -88,7 +87,7 @@ static void handle_event(AppEvent evt)
                 if(ret!=0) LOG_ERR("Alert Failed to send");
             }
             //Record Audio to SD Card and then stream over BLE
-            if (evt.type == EVENT_BUTTON_1_PRESS) {
+            if (evt.type == EVENT_BLE_RECORD) {
                 //Record Audio
                 led_controller_start_blinking(K_MSEC(150));
                 static char filename[MAX_FILENAME_LEN];

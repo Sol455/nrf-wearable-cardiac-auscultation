@@ -42,11 +42,12 @@
   <div class="container">
     <div class="card">
       <h2 class="mb-4">Heart Sound Patch Dashboard</h2>
-
       <div class="mb-3 d-flex align-items-center flex-wrap gap-2">
         <button class="btn btn-primary" onclick="simulateBeat()">Simulate Beat</button>
         <button class="btn btn-danger" onclick="toggleAlert()">Toggle Alert</button>
         <button class="btn btn-success" onclick="connectBLE()">Try Connect</button>
+        <button class="btn btn-warning" onclick="sendControlCommand(0x01)">Record</button>
+        <button class="btn btn-info" onclick="sendControlCommand(0x02)">Transfer</button>
         <span id="bleStatus" class="text-muted ms-2">Not connected</span>
       </div>
 
@@ -68,12 +69,14 @@
     </div>
   </div>
   </div>
+  
 
   <script>
     const MAX_POINTS = 50;
     let rmsData = [];
     let centroidData = [];
     let connectionStart = null;
+    let audioControlChar = null;
 
     const rmsCtx = document.getElementById('rmsChart').getContext('2d');
     const centroidCtx = document.getElementById('centroidChart').getContext('2d');
@@ -227,6 +230,7 @@
     const SERVICE_UUID = '09bd3e92-235b-4a5b-b00c-bd50e1749a44';
     const HEART_CHAR_UUID = '24ca214a-c44b-40d6-80d0-2a4e7b0ef0e3';
     const ALERT_CHAR_UUID = '359502d4-f343-48ce-97d9-d78fc37d69ee';
+    const AUDIO_CONTROL_CHAR_UUID = 'eee14fee-51ea-47ae-bac1-88d53039e5f0';
 
     async function connectBLE() {
       try {
@@ -234,7 +238,7 @@
 
         bleDevice = await navigator.bluetooth.requestDevice({
           filters: [{ services: [SERVICE_UUID] }],
-          optionalServices: [SERVICE_UUID]
+          optionalServices: [SERVICE_UUID, AUDIO_CONTROL_CHAR_UUID]
         });
 
         updateBLEStatus('Connecting...');
@@ -254,6 +258,8 @@
         const alertChar = await service.getCharacteristic(ALERT_CHAR_UUID);
         await alertChar.startNotifications();
         alertChar.addEventListener('characteristicvaluechanged', handleAlertNotification);
+
+        audioControlChar = await service.getCharacteristic(AUDIO_CONTROL_CHAR_UUID);
 
         console.log('Notification listener attached to heartChar');
 
@@ -318,6 +324,22 @@
     if ('serviceWorker' in navigator) {navigator.serviceWorker.register('sw.js')
     .then(reg => console.log(' Service worker registered'))
     .catch(err => console.error(' Service worker failed:', err));
+}
+
+
+  // Update/send command
+  async function sendControlCommand(cmd) {
+    if (!audioControlChar) {
+      console.warn('Audio control characteristic not available');
+      return;
+    }
+
+    try {
+      await audioControlChar.writeValue(Uint8Array.of(cmd));
+      console.log(`Sent control command: 0x${cmd.toString(16)}`);
+    } catch (err) {
+      console.error('Failed to write control command:', err);
+  }
 }
   </script>
 </body>
