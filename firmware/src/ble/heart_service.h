@@ -15,9 +15,19 @@
 #define BT_UUID_HEART_ALERT_VAL \
 	BT_UUID_128_ENCODE(0x359502D4, 0xF343, 0x48CE, 0x97D9, 0xD78FC37D69EE)
 
+
+#define BT_UUID_HEART_AUDIO_VAL \
+	BT_UUID_128_ENCODE(0x9E01A763, 0x5A3D, 0x4062, 0x9F70, 0xF98F9578E9C0)
+
+// 8BCDC55D-15F4-4B9B-8827-9A60F69495DE
+#define BT_UUID_HEART_CONTROL_VAL \
+	BT_UUID_128_ENCODE(0x8BCDC55D, 0x15F4, 0x4B9B, 0x8827, 0x9A60F69495DE)
+
 #define BT_UUID_HEART_SERVICE     BT_UUID_DECLARE_128(BT_UUID_HEART_SERVICE_VAL)
 #define BT_UUID_HEART_PACKET      BT_UUID_DECLARE_128(BT_UUID_HEART_PACKET_VAL)
 #define BT_UUID_HEART_ALERT       BT_UUID_DECLARE_128(BT_UUID_HEART_ALERT_VAL)
+#define BT_UUID_HEART_AUDIO     BT_UUID_DECLARE_128(BT_UUID_HEART_AUDIO_VAL)
+#define BT_UUID_HEART_CONTROL   BT_UUID_DECLARE_128(BT_UUID_HEART_CONTROL_VAL)
 
 struct heart_packet {
 	float rms;
@@ -28,7 +38,7 @@ struct heart_packet {
 int bt_heart_service_init();
 int bt_heart_service_notify_packet(const struct heart_packet *pkt);
 int bt_heart_service_notify_alert(uint8_t code);
-
+int bt_heart_service_send_audio_chunk(uint16_t offset); // new API
 
 #endif 
 
