@@ -87,14 +87,32 @@ static void handle_event(AppEvent evt)
                 ret = bt_heart_service_notify_alert(0x02);
                 if(ret!=0) LOG_ERR("Alert Failed to send");
             }
-            //Record Audio to SD Card
+            //Record Audio to SD Card and then stream over BLE
             if (evt.type == EVENT_BUTTON_1_PRESS) {
+                //Record Audio
                 led_controller_start_blinking(K_MSEC(150));
                 static char filename[MAX_FILENAME_LEN];
                 generate_filename(filename, sizeof(filename));
                 audio_stream_ptr->wav_config.file_name = filename;
                 ret = open_wav_for_write(&audio_stream_ptr->wav_config);
                 capture_audio(audio_stream_ptr);
+
+                //Send Via BLE
+                const int16_t *buf = get_audio_buffer();
+                size_t len_samples = get_audio_buffer_length();
+
+                if (buf && len_samples > 0) {
+                    size_t len_bytes = len_samples * sizeof(int16_t);
+                    int err = transmit_audio_buffer((const uint8_t *)buf, len_bytes);
+                    if (err) {
+                        LOG_ERR("Failed to transmit audio buffer: %d", err);
+                    } else {
+                        LOG_INF("Audio buffer transmitted successfully.");
+                    }
+                } else {
+                    LOG_WRN("No audio buffer available to transmit.");
+                }
+
                 led_controller_stop_blinking();
                 led_controller_on();
             }

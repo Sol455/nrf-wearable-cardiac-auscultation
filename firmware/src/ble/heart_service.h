@@ -46,5 +46,7 @@ int bt_heart_service_notify_packet(const struct heart_packet *pkt);
 int bt_heart_service_notify_alert(uint8_t code);
 int bt_heart_service_send_audio_chunk(uint16_t offset); // new API
 
+int transmit_audio_buffer(const uint8_t *buffer, size_t length);
+
 #endif 
 
