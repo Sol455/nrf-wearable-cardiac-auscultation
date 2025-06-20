@@ -17,6 +17,7 @@ LOG_MODULE_REGISTER(heart_service);
 
 static bool notify_enabled_packet = false;
 static bool notify_enabled_alert = false;
+static struct bt_heart_service_cb registered_callbacks;
 
 static void packet_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t value)
 {
@@ -28,36 +29,20 @@ static void alert_ccc_cfg_changed(const struct bt_gatt_attr *attr, uint16_t valu
 	notify_enabled_alert = (value == BT_GATT_CCC_NOTIFY);
 }
 
-//BLE audio transmit callback: 
-// static void control_point_write_cb(struct bt_conn *conn,
-// 	const struct bt_gatt_attr *attr,
-// 	const void *buf, uint16_t len,
-// 	uint16_t offset, uint8_t flags)
-// {
-static void control_point_write_cb(struct bt_conn *conn,
+static ssize_t control_point_write_cb(struct bt_conn *conn,
 	const struct bt_gatt_attr *attr,
 	const void *buf, uint16_t len,
 	uint16_t offset, uint8_t flags)
 {
+	if (len < 1) return 0;
+
 	const uint8_t *cmd = buf;
 
-	if (len < 1) return;
-
-	switch (cmd[0]) {
-		case 0x01: // Start recording
-			AppEvent rec_ev = { .type = EVENT_BLE_RECORD};
-			event_handler_post(rec_ev);   
-		break;
-
-		case 0x02: // Start upload
-			AppEvent up_ev = { .type = EVENT_BLE_TRANSMIT};
-			event_handler_post(up_ev); 
-		break;
-
-		default:
-			LOG_ERR("Unknown BLE control opcode: 0x%02X\n", cmd[0]);
-		break;
+	if (registered_callbacks.run_on_control_command) {
+		registered_callbacks.run_on_control_command(cmd[0]);
 	}
+
+	return len;
 }
 
 
@@ -90,9 +75,12 @@ BT_GATT_SERVICE_DEFINE(heart_svc,
 		NULL, control_point_write_cb, NULL),
 );
 
-//@TO-DO Register callbacks here if needed
-int bt_heart_service_init()
+int bt_heart_service_init(const struct bt_heart_service_cb *callbacks)
 {
+	if (!callbacks || !callbacks->run_on_control_command) {
+		return -EINVAL;
+	}
+	registered_callbacks = *callbacks; 
 	LOG_INF("Heart Service initialized");
 	return 0;
 }

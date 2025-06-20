@@ -35,7 +35,13 @@ struct heart_packet {
 	uint32_t timestamp_ms;
 } __packed;
 
-int bt_heart_service_init();
+typedef void (*heart_control_cb_t)(uint8_t opcode);
+
+struct bt_heart_service_cb {
+	heart_control_cb_t run_on_control_command;
+};
+
+int bt_heart_service_init(const struct bt_heart_service_cb *callbacks);
 int bt_heart_service_notify_packet(const struct heart_packet *pkt);
 int bt_heart_service_notify_alert(uint8_t code);
 int bt_heart_service_send_audio_chunk(uint16_t offset); // new API

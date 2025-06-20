@@ -126,9 +126,27 @@ static struct bt_conn_auth_cb conn_auth_callbacks = {
     .cancel = auth_cancel,
 };
 
+static void heart_control_handler(uint8_t opcode){
+    switch (opcode) {
+        case 0x01:
+            event_handler_post((AppEvent){ .type = EVENT_BLE_RECORD });
+            break;
+        case 0x02:
+            event_handler_post((AppEvent){ .type = EVENT_BLE_TRANSMIT });
+            break;
+        default:
+            LOG_WRN("Unhandled opcode: 0x%02X", opcode);
+    }
+}
+
 static struct bt_conn_auth_info_cb conn_auth_info_callbacks = {
     .pairing_complete = pairing_complete,
-    .pairing_failed = pairing_failed};
+    .pairing_failed = pairing_failed
+};
+
+static struct bt_heart_service_cb hs_control_callbacks = {
+    .run_on_control_command = heart_control_handler,
+};
 
 int ble_init()
 {
@@ -163,7 +181,7 @@ int ble_init()
         settings_load();
     }
 
-    ret = bt_heart_service_init();
+    ret = bt_heart_service_init(&hs_control_callbacks);
     if (ret)
     {
         LOG_ERR("Failed to init Heart Service (err:%d)\n", ret);
