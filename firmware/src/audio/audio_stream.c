@@ -10,6 +10,9 @@ K_MSGQ_DEFINE(device_message_queue, sizeof(struct save_wave_msg), 8, 4);
 
 K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, MEM_SLAB_BLOCK_COUNT, 4); //align mem slab to 4 bytes
 
+K_SEM_DEFINE(buf_ready_sem, 0, 1); // set by producer, waited by consumer
+K_SEM_DEFINE(buf_done_sem, 1, 1);
+
 uint8_t writing = 0;
 
 //Debug audio streaming config
@@ -88,7 +91,7 @@ int pdm_init(AudioStream * audio_stream) {
     return 0;
 }
 
-void process_audio() {
+void consumer_process_audio() {
     struct save_wave_msg msg;
 
     while(1) {
@@ -165,25 +168,54 @@ LOG_INF("Audio Capture Finished");
 return ret;
 }
 
+//=========================================Wav file tests====================================
+void consumer_process_audio_wav() {
+    struct save_wave_msg msg;
+
+    while(1) {
+        k_sem_take(&buf_ready_sem, K_FOREVER);
+        if (k_msgq_get(&device_message_queue, &msg, K_FOREVER) == 0) {
+            LOG_INF("Consumer: Received data %p\n", msg.buffer);
+            int ret = 0;
+            
+
+            //Process Audio here--> call DSP function
+            LOG_INF("Written Data sucessfully");
+
+            k_sem_give(&buf_done_sem);            
+
+
+        }
+    }
+}
+
+
 int16_t temp_wav_buffer[BLOCK_SIZE_SAMPLES];
 
-void capture_audio_from_wav(WavConfig *wav_config) {
-    int samples_read;
+void producer_capture_audio_from_wav(WavConfig *wav_config) {
+    int samples_read = 1;
     int block_count = 0;
-    while ((samples_read = read_wav_block(wav_config, temp_wav_buffer, BLOCK_SIZE_SAMPLES)) > 0) {
-        // for (int i = 0; i < samples_read; ++i) {
-        //     fbuf[i] = buffer[i] / 32768.0f;
-        // }
+    struct save_wave_msg msg;
+
+    while (samples_read  > 0) {
+        k_sem_take(&buf_done_sem, K_FOREVER);
+        samples_read = read_wav_block(wav_config, temp_wav_buffer, BLOCK_SIZE_SAMPLES);
+        msg.buffer = temp_wav_buffer;
+        msg.size = MAX_BLOCK_SIZE;
+        int ret = k_msgq_put(&device_message_queue, &msg, K_NO_WAIT);
         block_count++;
         LOG_INF("%d amples read \n", samples_read);
+        k_sem_give(&buf_ready_sem); 
 
     }
     sd_card_close(wav_config->wav_file);
     LOG_INF("Processed %d blocks from WAV file\n", block_count);
 }
+//=========================================================================================================
+
 
 void generate_filename(char *filename_out, size_t max_len) {
     static uint32_t file_counter = 0;
     snprintf(filename_out, max_len, "%08u.wav", file_counter++);}
 
-K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, process_audio, NULL, NULL, NULL, 3, 0, 0);
+K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, consumer_process_audio_wav, NULL, NULL, NULL, 3, 0, 0);

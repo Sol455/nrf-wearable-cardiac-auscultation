@@ -87,7 +87,7 @@ int _read_wav() {
             read_wav_config.header.num_channels,
             read_wav_config.header.bit_depth);
     }
-    capture_audio_from_wav(&read_wav_config);
+    producer_capture_audio_from_wav(&read_wav_config);
     // Now read audio blocks as needed!
     //capture_audio(audio_stream_ptr);
     return ret;

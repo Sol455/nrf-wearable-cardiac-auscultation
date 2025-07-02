@@ -29,7 +29,7 @@ void process_audio();
 
 void generate_filename(char *filename_out, size_t max_len);
 
-void capture_audio_from_wav(WavConfig *wav_config);
+void producer_capture_audio_from_wav(WavConfig *wav_config);
 
 //Audio Transmission Functions
 const int16_t *get_audio_buffer(void);          
