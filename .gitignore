@@ -1,3 +1,26 @@
 build*/
 .vscode/settings.json
 firmware/.vscode/settings.json
+
+# Python
+python_dsp/__pycache__/
+python_dsp/se_peak/__pycache__
+*.py[cod]
+*$py.class
+
+# Virtual environments
+python_dsp/venv/
+python_dsp/.venv/
+python_dsp/env/
+python_dsp/.env/
+
+# Jupyter Notebook checkpoints
+python_dsp/.ipynb_checkpoints
+
+python_dsp/.vscode/
+*.pyc
+*.WAV
+*.png
+*.dat
+*.pyc
+*.png
