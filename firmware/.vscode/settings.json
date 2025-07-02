@@ -20,7 +20,9 @@
         "types.h": "c",
         "lbs.h": "c",
         "stddef.h": "c",
-        "heart_service.h": "c"
+        "heart_service.h": "c",
+        "vector": "c",
+        "circular_block_buffer.h": "c"
     },
     "nrf-connect.applications": [
         "${workspaceFolder}"
