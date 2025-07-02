@@ -96,6 +96,7 @@ static void handle_event(AppEvent evt)
                 ret = open_wav_for_write(&audio_stream_ptr->wav_config);
                 capture_audio(audio_stream_ptr);
 
+                #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
                 //Send Via BLE
                 const int16_t *buf = get_audio_buffer();
                 size_t len_samples = get_audio_buffer_length();
@@ -111,6 +112,7 @@ static void handle_event(AppEvent evt)
                 } else {
                     LOG_WRN("No audio buffer available to transmit.");
                 }
+                #endif
 
                 led_controller_stop_blinking();
                 led_controller_on();

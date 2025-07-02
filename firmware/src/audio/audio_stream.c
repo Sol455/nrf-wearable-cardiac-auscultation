@@ -12,6 +12,9 @@ K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, MEM_SLAB_BLOCK_COUNT, 4); //a
 
 uint8_t writing = 0;
 
+//Debug audio streaming config
+#if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
+
 static int16_t audio_buf[AUDIO_BUF_TOTAL_SIZE];
 static size_t audio_buf_offset = 0;
 
@@ -40,6 +43,8 @@ void write_to_buffer(const struct save_wave_msg *msg)
 
     LOG_INF("Wrote %u int16_t samples to audio_buf (offset now %u)", num_samples, audio_buf_offset);
 }
+
+#endif
 
 int pdm_init(AudioStream * audio_stream) {
     if (!device_is_ready(audio_stream->dmic_ctx)) {
@@ -94,7 +99,9 @@ void process_audio() {
                 LOG_ERR("Failed to write wav header");
             }
 
+            #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
             write_to_buffer(&msg);
+            #endif
             ret = write_wav_data(msg.audio_file, msg.buffer, msg.size);
             //PROCESS AUDIO / DSP HERE:
             //

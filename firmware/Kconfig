@@ -4,6 +4,16 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
+menu "Heart Patch Modes"
+
+config HEART_PATCH_DSP_MODE
+    bool "Enable DSP processing mode"
+    default y
+    help
+      Select this to enable DSP feature processing.
+      Disable to use Download/Raw Audio mode.
+endmenu
+
 menuconfig NRF5340_AUDIO
 	 bool "nRF5340 Audio [EXPERIMENTAL]"
 	 select EXPERIMENTAL
