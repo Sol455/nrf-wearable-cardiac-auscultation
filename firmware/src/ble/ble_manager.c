@@ -35,6 +35,45 @@ static const struct bt_data sd[] = {
     BT_DATA_BYTES(BT_DATA_UUID128_ALL, BT_UUID_HEART_SERVICE_VAL),
 };
 
+static struct bt_gatt_exchange_params exchange_params;
+
+//Private function prototypes:
+// static void update_data_length(struct bt_conn *conn);
+// static void update_mtu(struct bt_conn *conn);
+
+//=======================================Data Length Adjustments============================================
+static void update_data_length(struct bt_conn *conn)
+{
+    int err;
+    struct bt_conn_le_data_len_param data_len = {
+        .tx_max_len = BT_GAP_DATA_LEN_MAX,
+        .tx_max_time = BT_GAP_DATA_TIME_MAX,
+    };
+    err = bt_conn_le_data_len_update(conn, &data_len);
+    if (err) {
+        LOG_ERR("data_len_update failed (err %d)", err);
+    }
+}
+
+static void exchange_func(struct bt_conn *conn, uint8_t att_err,
+			  struct bt_gatt_exchange_params *params)
+{
+	LOG_INF("MTU exchange %s", att_err == 0 ? "successful" : "failed");
+    if (!att_err) {
+        uint16_t payload_mtu = bt_gatt_get_mtu(conn) - 3;   // 3 bytes used for Attribute headers.
+        LOG_INF("New MTU: %d bytes", payload_mtu);
+    }
+}
+
+static void update_mtu(struct bt_conn *conn)
+{
+    int err;
+    exchange_params.func = exchange_func;  err = bt_gatt_exchange_mtu(conn, &exchange_params);
+    if (err) {
+    LOG_ERR("bt_gatt_exchange_mtu failed (err %d)", err);
+    }
+}
+
 //========================================Connection Callbacks==============================================
 
 static void connected(struct bt_conn *conn, uint8_t err)
@@ -44,6 +83,10 @@ static void connected(struct bt_conn *conn, uint8_t err)
         LOG_ERR("Connection failed, err 0x%02x %s\n", err, bt_hci_err_to_str(err));
         return;
     }
+
+    //Attempt to update MTU and data length here....
+    update_data_length(conn);
+	update_mtu(conn);
 
     AppEvent ev = {.type = EVENT_BLE_CONNECTED};
     event_handler_post(ev);
@@ -77,10 +120,20 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
     }
 }
 
+void on_le_data_len_updated(struct bt_conn *conn, struct bt_conn_le_data_len_info *info)
+{
+    uint16_t tx_len     = info->tx_max_len; 
+    uint16_t tx_time    = info->tx_max_time;
+    uint16_t rx_len     = info->rx_max_len;
+    uint16_t rx_time    = info->rx_max_time;
+    LOG_INF("Data length updated. Length %d/%d bytes, time %d/%d us", tx_len, rx_len, tx_time, rx_time);
+}
+
 BT_CONN_CB_DEFINE(conn_callbacks) = {
     .connected = connected,
     .disconnected = disconnected,
     .security_changed = security_changed,
+    .le_data_len_updated  = on_le_data_len_updated,
 };
 
 //========================================Security and pairing callbacks==============================================
@@ -126,9 +179,28 @@ static struct bt_conn_auth_cb conn_auth_callbacks = {
     .cancel = auth_cancel,
 };
 
+static void heart_control_handler(uint8_t opcode){
+    switch (opcode) {
+        case 0x01:
+            event_handler_post((AppEvent){ .type = EVENT_BLE_RECORD });
+            break;
+        case 0x02:
+            event_handler_post((AppEvent){ .type = EVENT_BLE_TRANSMIT });
+            break;
+        default:
+            LOG_WRN("Unhandled opcode: 0x%02X", opcode);
+    }
+}
+
+
 static struct bt_conn_auth_info_cb conn_auth_info_callbacks = {
     .pairing_complete = pairing_complete,
-    .pairing_failed = pairing_failed};
+    .pairing_failed = pairing_failed
+};
+
+static struct bt_heart_service_cb hs_control_callbacks = {
+    .run_on_control_command = heart_control_handler,
+};
 
 int ble_init()
 {
@@ -163,7 +235,7 @@ int ble_init()
         settings_load();
     }
 
-    ret = bt_heart_service_init();
+    ret = bt_heart_service_init(&hs_control_callbacks);
     if (ret)
     {
         LOG_ERR("Failed to init Heart Service (err:%d)\n", ret);

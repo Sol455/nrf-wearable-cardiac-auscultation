@@ -29,4 +29,8 @@ void process_audio();
 
 void generate_filename(char *filename_out, size_t max_len);
 
+//Audio Transmission Functions
+const int16_t *get_audio_buffer(void);          
+size_t get_audio_buffer_length(void);
+
 #endif
