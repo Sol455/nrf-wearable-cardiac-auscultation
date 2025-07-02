@@ -27,18 +27,18 @@ size_t get_audio_buffer_length(void)
 
 void write_to_buffer(const struct save_wave_msg *msg)
 {
-	size_t num_samples = msg->size / sizeof(float);
-	const float *src = (const float *)msg->buffer;
+    size_t num_samples = msg->size / sizeof(int16_t);
+    const int16_t *src = (const int16_t *)msg->buffer;
 
-	if ((audio_buf_offset + num_samples) > AUDIO_BUF_TOTAL_SIZE) {
-		LOG_ERR("Audio buffer overflow — dropping %u bytes", msg->size);
-		return;
-	}
+    if ((audio_buf_offset + num_samples) > AUDIO_BUF_TOTAL_SIZE) {
+        LOG_ERR("Audio buffer overflow — dropping %u bytes", msg->size);
+        return;
+    }
 
-	memcpy(&audio_buf[audio_buf_offset], src, msg->size);
-	audio_buf_offset += num_samples;
+    memcpy(&audio_buf[audio_buf_offset], src, msg->size);
+    audio_buf_offset += num_samples;
 
-	LOG_INF("Wrote %u float samples to audio_buf (offset now %u)", num_samples, audio_buf_offset);
+    LOG_INF("Wrote %u int16_t samples to audio_buf (offset now %u)", num_samples, audio_buf_offset);
 }
 
 int pdm_init(AudioStream * audio_stream) {
