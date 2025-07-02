@@ -17,6 +17,7 @@
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
 
 #define MAX_BLOCK_SIZE  BLOCK_SIZE(MAX_SAMPLE_RATE, NUM_CHANNELS)
+#define BLOCK_SIZE_SAMPLES MAX_BLOCK_SIZE / 2
 
 #define MAX_FILENAME_LEN 16
 

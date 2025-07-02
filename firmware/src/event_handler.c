@@ -63,13 +63,33 @@ void _connect() {
     app_state = STATE_CONNECTED;
 }
 
-int _record() {
+int _record_to_wav() {
     led_controller_start_blinking(K_MSEC(150));
     static char filename[MAX_FILENAME_LEN];
     generate_filename(filename, sizeof(filename));
     audio_stream_ptr->wav_config.file_name = filename;
     int ret = open_wav_for_write(&audio_stream_ptr->wav_config);
     capture_audio(audio_stream_ptr);
+    return ret;
+}
+
+int _read_wav() {
+    static struct fs_file_t read_wav_file;
+        WavConfig read_wav_config = {
+        .wav_file = &read_wav_file,
+        .file_name = "00000000.wav",
+    };
+    led_controller_start_blinking(K_MSEC(150));
+    int ret = open_wav_for_read(&read_wav_config);
+    if (ret == 0) {
+        printk("WAV: %d Hz, %d ch, %d bits/sample\n",
+            read_wav_config.header.sample_rate,
+            read_wav_config.header.num_channels,
+            read_wav_config.header.bit_depth);
+    }
+    capture_audio_from_wav(&read_wav_config);
+    // Now read audio blocks as needed!
+    //capture_audio(audio_stream_ptr);
     return ret;
 }
 
@@ -118,8 +138,7 @@ static void handle_event(AppEvent evt)
             }
             //Record Audio to SD Card and then stream over BLE
             if (evt.type == EVENT_BLE_RECORD) {
-                ret = _record();
-
+                ret = _read_wav();
                 #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
                 _tramsit_audio_ble();
                 #endif

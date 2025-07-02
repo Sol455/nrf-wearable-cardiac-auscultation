@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "wav_file.h"
+#include "../modules/sd_card.h"
 
 LOG_MODULE_REGISTER(audio_wavfile);
 
@@ -94,4 +95,47 @@ int open_wav_for_write(WavConfig *wav_config) {
 			);
 			return 0;
 		}
+}
+
+int open_wav_for_read(WavConfig *wav_config) {
+    fs_file_t_init(wav_config->wav_file);
+    int ret = sd_card_open(wav_config->file_name, wav_config->wav_file);
+    if (ret != 0) {
+        LOG_ERR("Failed to open WAV file for read, rc=%d", ret);
+        return -1;
+    }
+    ret = read_wav_header(wav_config->wav_file, &wav_config->header);
+    if (ret < 0) {
+        LOG_ERR("Failed to read WAV header, rc=%d", ret);
+        sd_card_close(wav_config->wav_file);
+        return -1;
+    }
+    if (strncmp(wav_config->header.riff_header, "RIFF", 4) != 0 ||
+        strncmp(wav_config->header.wav_header, "WAVE", 4) != 0 ||
+        strncmp(wav_config->header.fmt_header, "fmt ", 4) != 0 ||
+        strncmp(wav_config->header.data_header, "data", 4) != 0) {
+        LOG_ERR("Invalid WAV file header!");
+        sd_card_close(wav_config->wav_file);
+        return -1;
+    }
+    wav_config->sample_rate = wav_config->header.sample_rate;
+    wav_config->num_channels = wav_config->header.num_channels;
+    wav_config->bytes_per_sample = wav_config->header.bit_depth / 8;
+    wav_config->length = wav_config->header.data_bytes / wav_config->bytes_per_sample;
+    return 0;
+}
+
+int read_wav_block(WavConfig *wav_config, int16_t *buffer, size_t samples_per_block) {
+    size_t bytes_to_read = samples_per_block * sizeof(int16_t);
+    size_t bytes_read = bytes_to_read;
+    int ret = sd_card_read((char*)buffer, &bytes_read, wav_config->wav_file);
+    if (ret != 0) {
+        LOG_ERR("Error reading WAV block, rc=%d", ret);
+        return -1;
+    }
+    if (bytes_read == 0) {
+        // End of file
+        return 0;
+    }
+    return bytes_read / sizeof(int16_t);
 }

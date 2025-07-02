@@ -95,17 +95,12 @@ void process_audio() {
         if (k_msgq_get(&device_message_queue, &msg, K_FOREVER) == 0) {
             LOG_INF("Consumer: Received data %p\n", msg.buffer);
             int ret = 0;
-            if(ret!=0) {
-                LOG_ERR("Failed to write wav header");
-            }
-
             #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
             write_to_buffer(&msg);
             #endif
             ret = write_wav_data(msg.audio_file, msg.buffer, msg.size);
             //PROCESS AUDIO / DSP HERE:
             //
-
             k_mem_slab_free(&mem_slab, msg.buffer);
             if (ret != 0) {
                 LOG_ERR("Failed to write to file, rc=%d", ret);
@@ -168,6 +163,23 @@ while (1) {
 LOG_INF("Audio Capture Finished");
 
 return ret;
+}
+
+int16_t temp_wav_buffer[BLOCK_SIZE_SAMPLES];
+
+void capture_audio_from_wav(WavConfig *wav_config) {
+    int samples_read;
+    int block_count = 0;
+    while ((samples_read = read_wav_block(wav_config, temp_wav_buffer, BLOCK_SIZE_SAMPLES)) > 0) {
+        // for (int i = 0; i < samples_read; ++i) {
+        //     fbuf[i] = buffer[i] / 32768.0f;
+        // }
+        block_count++;
+        LOG_INF("%d amples read \n", samples_read);
+
+    }
+    sd_card_close(wav_config->wav_file);
+    LOG_INF("Processed %d blocks from WAV file\n", block_count);
 }
 
 void generate_filename(char *filename_out, size_t max_len) {
