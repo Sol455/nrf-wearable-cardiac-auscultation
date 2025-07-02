@@ -21,4 +21,8 @@
 
 #define MAX_FILENAME_LEN 16
 
+//Circular Buffer
+#define CB_NUM_BLOCKS 20
+#define CB_BLOCK_SAMPLES BLOCK_SIZE_SAMPLES
+
 #endif
