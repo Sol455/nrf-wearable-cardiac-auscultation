@@ -36,7 +36,7 @@ struct wav_header {
 
 typedef struct {
 	struct fs_file_t *wav_file;
-	char* file_name;
+	char file_name[32];
 	uint32_t length; 
 	uint16_t sample_rate;
 	uint16_t bytes_per_sample; 

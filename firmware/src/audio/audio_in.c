@@ -90,7 +90,6 @@ int pdm_capture_audio() {
         }
         msg.msg_type = AUDIO_BLOCK_TYPE_DATA;
         LOG_INF("%d - got buffer %p of %u bytes", i, msg.buffer, msg.size);
-        //writing = 1;
         ret = k_msgq_put(_audio_in_config.msgq, &msg, K_NO_WAIT);
         if (ret < 0) {
         LOG_ERR("Failed to enqueue message: %d", ret);
@@ -133,24 +132,17 @@ void wav_file_capture_audio(AudioInConfig *audio_in_config, struct k_msgq *msgq)
 void generate_wav_filename() {
     static uint32_t file_counter = 0;
     snprintf(_audio_in_config.output_wav_config.file_name, 
-             sizeof(_audio_in_config.input_wav_config.file_name),
+             sizeof(_audio_in_config.output_wav_config.file_name),
              "%08u.wav", file_counter++);
 }
 
 int audio_in_init(AudioInConfig audio_in_config) {
     _audio_in_config = audio_in_config;
-    //audio_in_config_local.mem_slab = mem_slab;
-    LOG_INF("1. Got here");
-
     switch (_audio_in_config.audio_input_type) {
         
         case AUDIO_INPUT_TYPE_PDM:
             return pdm_init();
         case AUDIO_INPUT_TYPE_PDM_TO_WAV:
-            LOG_INF("2. Got here");
-
-            LOG_INF("3. Got here");
-
             pdm_init();
             return -1;
         case AUDIO_INPUT_TYPE_WAV:
@@ -169,7 +161,7 @@ int audio_in_start() {
         case AUDIO_INPUT_TYPE_PDM :
             ret = pdm_capture_audio();
         case AUDIO_INPUT_TYPE_PDM_TO_WAV:
-            //generate_wav_filename();
+            generate_wav_filename();
             open_wav_for_write(&_audio_in_config.output_wav_config);
             ret = pdm_capture_audio();
             break;

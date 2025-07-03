@@ -24,3 +24,5 @@ python_dsp/.vscode/
 *.dat
 *.pyc
 *.png
+firmware/.vscode/settings.json
+firmware/.vscode/settings.json
