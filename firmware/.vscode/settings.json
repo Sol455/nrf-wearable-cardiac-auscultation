@@ -22,7 +22,9 @@
         "stddef.h": "c",
         "heart_service.h": "c",
         "vector": "c",
-        "circular_block_buffer.h": "c"
+        "circular_block_buffer.h": "c",
+        "audio_in.h": "c",
+        "nrfx_pdm.h": "c"
     },
     "nrf-connect.applications": [
         "${workspaceFolder}"

@@ -18,18 +18,18 @@ typedef struct {
 struct save_wave_msg {
 	void *buffer;
 	size_t size;
-	struct fs_file_t *audio_file
+	struct fs_file_t *audio_file;
 };
 
-int pdm_init(AudioStream * audio_stream);
+extern struct k_msgq audio_in_message_queue;
 
-int capture_audio(AudioStream *audio_stream);
+//int pdm_init(AudioStream * audio_stream);
 
-void process_audio();
+//int capture_audio(AudioStream *audio_stream);
 
-void generate_filename(char *filename_out, size_t max_len);
+void consume_audio();
 
-void producer_capture_audio_from_wav(WavConfig *wav_config);
+//void producer_capture_audio_from_wav(WavConfig *wav_config);
 
 //Audio Transmission Functions
 const int16_t *get_audio_buffer(void);          

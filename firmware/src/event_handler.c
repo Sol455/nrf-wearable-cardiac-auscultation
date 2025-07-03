@@ -4,6 +4,8 @@
 #include "modules/led_controller.h"
 #include "ble/ble_manager.h"
 #include "ble/heart_service.h"
+#include "audio/audio_in.h"
+#include "audio/audio_stream.h"
 
 LOG_MODULE_REGISTER(event_handler);
 
@@ -18,11 +20,11 @@ typedef enum {
 } AppState;
 
 static AppState app_state = STATE_IDLE;
-static AudioStream *audio_stream_ptr = NULL;
+//static AudioStream *audio_stream_ptr = NULL;
 
-void event_handler_set_audio_stream(AudioStream *audio_stream) {
-    audio_stream_ptr = audio_stream;
-}
+// void event_handler_set_audio_stream(AudioStream *audio_stream) {
+//     audio_stream_ptr = audio_stream;
+// }
 
 void event_handler_post(AppEvent evt)
 {
@@ -65,33 +67,28 @@ void _connect() {
 
 int _record_to_wav() {
     led_controller_start_blinking(K_MSEC(150));
-    static char filename[MAX_FILENAME_LEN];
-    generate_filename(filename, sizeof(filename));
-    audio_stream_ptr->wav_config.file_name = filename;
-    int ret = open_wav_for_write(&audio_stream_ptr->wav_config);
-    capture_audio(audio_stream_ptr);
-    return ret;
+    audio_in_start();
 }
 
-int _read_wav() {
-    static struct fs_file_t read_wav_file;
-        WavConfig read_wav_config = {
-        .wav_file = &read_wav_file,
-        .file_name = "00000000.wav",
-    };
-    led_controller_start_blinking(K_MSEC(150));
-    int ret = open_wav_for_read(&read_wav_config);
-    if (ret == 0) {
-        printk("WAV: %d Hz, %d ch, %d bits/sample\n",
-            read_wav_config.header.sample_rate,
-            read_wav_config.header.num_channels,
-            read_wav_config.header.bit_depth);
-    }
-    producer_capture_audio_from_wav(&read_wav_config);
-    // Now read audio blocks as needed!
-    //capture_audio(audio_stream_ptr);
-    return ret;
-}
+// int _read_wav() {
+//     static struct fs_file_t read_wav_file;
+//         WavConfig read_wav_config = {
+//         .wav_file = &read_wav_file,
+//         .file_name = "00000000.wav",
+//     };
+//     led_controller_start_blinking(K_MSEC(150));
+//     int ret = open_wav_for_read(&read_wav_config);
+//     if (ret == 0) {
+//         printk("WAV: %d Hz, %d ch, %d bits/sample\n",
+//             read_wav_config.header.sample_rate,
+//             read_wav_config.header.num_channels,
+//             read_wav_config.header.bit_depth);
+//     }
+//     producer_capture_audio_from_wav(&read_wav_config);
+//     // Now read audio blocks as needed!
+//     //capture_audio(audio_stream_ptr);
+//     return ret;
+//}
 
 #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
 void _transit_audio_ble() {
@@ -119,7 +116,7 @@ static void handle_event(AppEvent evt)
     int ret;
     switch (app_state) {
         case STATE_IDLE:
-            if (evt.type == EVENT_BUTTON_0_PRESS && audio_stream_ptr != NULL) {
+            if (evt.type == EVENT_BUTTON_0_PRESS) {
                 _advertise();
             }
             break;
@@ -138,7 +135,7 @@ static void handle_event(AppEvent evt)
             }
             //Record Audio to SD Card and then stream over BLE
             if (evt.type == EVENT_BLE_RECORD) {
-                ret = _read_wav();
+                ret = _record_to_wav();
                 #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
                 _tramsit_audio_ble();
                 #endif

@@ -14,6 +14,7 @@ target_sources(app PRIVATE src/modules/button_handler.c)
 target_sources(app PRIVATE src/modules/led_controller.c)
 target_sources(app PRIVATE src/audio/audio_stream.c)
 target_sources(app PRIVATE src/audio/circular_block_buffer.c)
+target_sources(app PRIVATE src/audio/audio_in.c)
 
 target_sources(app PRIVATE src/ble/ble_manager.c)
 target_sources(app PRIVATE src/ble/heart_service.c)

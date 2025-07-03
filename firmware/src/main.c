@@ -5,6 +5,7 @@
 #include "modules/led_controller.h"
 #include "modules/sd_card.h"
 #include "audio/wav_file.h"
+#include "audio/audio_in.h"
 #include "audio/audio_stream.h"
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/audio/dmic.h>
@@ -28,25 +29,33 @@ int main(void)
 
 	static struct fs_file_t wav_file;
 
-	WavConfig wav_config = {
+	WavConfig output_wav_config = {
 			.wav_file = &wav_file,
-			.file_name = "testfile.wav",
+			.file_name = "testy.wav",
 			.length = WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE,
 			.sample_rate = MAX_SAMPLE_RATE,
 			.bytes_per_sample = BYTES_PER_SAMPLE,
 			.num_channels = NUM_CHANNELS,
 	};
 
-	AudioStream audio_stream = {
-		.wav_config = wav_config,
+	AudioInConfig audio_in_config = {
+		.audio_input_type = AUDIO_INPUT_TYPE_PDM_TO_WAV,
+		.output_wav_config = output_wav_config,
 		.dmic_ctx = DEVICE_DT_GET(DT_NODELABEL(pdm0)),
-		.pdm_gain = NRF_PDM_GAIN_MAXIMUM
+		.pdm_gain = NRF_PDM_GAIN_MAXIMUM,
+		.msgq = &audio_in_message_queue,
 	};
+
+	// AudioStream audio_stream = {
+	// 	.wav_config = wav_config,
+	// 	.dmic_ctx = DEVICE_DT_GET(DT_NODELABEL(pdm0)),
+	// 	.pdm_gain = NRF_PDM_GAIN_MAXIMUM
+	// };
 
     LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
 
-	ret = pdm_init(&audio_stream);
-	if (ret != 0) LOG_ERR("pdm config failed");
+	ret = audio_in_init(audio_in_config);
+	if (ret != 0) LOG_ERR("Audio In Config Failed");
 	
     ret = sd_card_init();
 	if(ret!=0) LOG_ERR("SD Failed to init");
@@ -54,7 +63,7 @@ int main(void)
 	ret = ble_init();
 	if(ret!=0) LOG_ERR("BLE Failed to init");
 
-    event_handler_set_audio_stream(&audio_stream);
+    //event_handler_set_audio_stream(&audio_stream);
 
     //Start up the application
     AppEvent ev = { .type = EVENT_START_UP};
