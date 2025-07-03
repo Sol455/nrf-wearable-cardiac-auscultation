@@ -51,6 +51,26 @@ void _send_demo_heartbeat_packet()
     }
 }
 
+#if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
+void _transmit_audio_ble() {
+    //Send Via BLE
+    const int16_t *buf = get_audio_buffer();
+    size_t len_samples = get_audio_buffer_length();
+
+    if (buf && len_samples > 0) {
+        size_t len_bytes = len_samples * sizeof(int16_t);
+        int ret = transmit_audio_buffer((const uint8_t *)buf, len_bytes);
+        if (ret) {
+            LOG_ERR("Failed to transmit audio buffer: %d", ret);
+        } else {
+            LOG_INF("Audio buffer transmitted successfully.");
+        }
+        } else {
+        LOG_WRN("No audio buffer available to transmit.");
+    }
+}
+#endif
+
 //===========================================FSM State function wrappers===================================
 void _advertise() {
     led_controller_start_blinking(K_MSEC(500));
@@ -65,9 +85,12 @@ void _connect() {
     app_state = STATE_CONNECTED;
 }
 
-int _record_to_wav() {
+void _record_to_wav() {
     led_controller_start_blinking(K_MSEC(150));
     audio_in_start();
+    #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
+        _transmit_audio_ble();
+    #endif
 }
 
 // int _read_wav() {
@@ -90,25 +113,7 @@ int _record_to_wav() {
 //     return ret;
 //}
 
-#if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
-void _transit_audio_ble() {
-    //Send Via BLE
-    const int16_t *buf = get_audio_buffer();
-    size_t len_samples = get_audio_buffer_length();
 
-    if (buf && len_samples > 0) {
-        size_t len_bytes = len_samples * sizeof(int16_t);
-        int ret = transmit_audio_buffer((const uint8_t *)buf, len_bytes);
-        if (ret) {
-            LOG_ERR("Failed to transmit audio buffer: %d", err);
-        } else {
-            LOG_INF("Audio buffer transmitted successfully.");
-        }
-        } else {
-        LOG_WRN("No audio buffer available to transmit.");
-    }
-}
-#endif
 //========================================================================================================
 
 static void handle_event(AppEvent evt)
@@ -135,10 +140,7 @@ static void handle_event(AppEvent evt)
             }
             //Record Audio to SD Card and then stream over BLE
             if (evt.type == EVENT_BLE_RECORD) {
-                ret = _record_to_wav();
-                #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
-                _tramsit_audio_ble();
-                #endif
+                _record_to_wav();
                 led_controller_stop_blinking();
                 led_controller_on();
             }

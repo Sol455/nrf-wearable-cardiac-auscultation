@@ -11,6 +11,10 @@ int16_t wav_input_buffer[BLOCK_SIZE_SAMPLES];
 
 static AudioInConfig _audio_in_config; 
 
+struct k_mem_slab *audio_in_get_mem_slab(void) {
+    return &pdm_mem_slab;
+}
+
 int pdm_init() {
     if (!device_is_ready(_audio_in_config.dmic_ctx)) {
         LOG_ERR("%s is not ready", _audio_in_config.dmic_ctx->name);
@@ -161,7 +165,6 @@ int audio_in_init(AudioInConfig audio_in_config) {
 
 int audio_in_start() {
     int ret;
-    LOG_INF("HELLO 1");
     switch (_audio_in_config.audio_input_type) {
         case AUDIO_INPUT_TYPE_PDM :
             ret = pdm_capture_audio();
@@ -169,10 +172,8 @@ int audio_in_start() {
             //generate_wav_filename();
             open_wav_for_write(&_audio_in_config.output_wav_config);
             ret = pdm_capture_audio();
-            LOG_INF("HELLO 3");
             break;
         case AUDIO_INPUT_TYPE_WAV:
-            LOG_INF("HELLO 4");
             ret = open_wav_for_read(&_audio_in_config.input_wav_config);
         default:
             LOG_ERR("Unknown audio input type!");
@@ -180,5 +181,6 @@ int audio_in_start() {
     }
     return ret;
 }
+
 
 

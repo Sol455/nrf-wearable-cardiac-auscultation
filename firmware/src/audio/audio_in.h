@@ -20,7 +20,7 @@ typedef struct {
     const struct device *dmic_ctx;
     nrf_pdm_gain_t pdm_gain;
     WavConfig output_wav_config;
-    struct k_msgq *msgq
+    struct k_msgq *msgq;
 } AudioInConfig;
 
 typedef enum {
@@ -36,7 +36,7 @@ typedef struct {
     struct fs_file_t *audio_output_file; //Only needed if saving to SD
 } audio_slab_msg;
 
-extern struct k_mem_slab pdm_mem_slab;
+struct k_mem_slab *audio_in_get_mem_slab(void);
 int audio_in_init(AudioInConfig audio_in_config);
 int pdm_init();
 void pdm_stop();

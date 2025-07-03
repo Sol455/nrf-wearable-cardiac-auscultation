@@ -9,20 +9,16 @@
 #include "../macros.h"
 
 typedef struct {
-    WavConfig wav_config;
-    const struct device *const dmic_ctx;
-    //struct k_mem_slab *mem_slab; 
-    nrf_pdm_gain_t pdm_gain;
-} AudioStream;
+    struct k_mem_slab *mem_slab; 
+} AudioStreamConfig;
 
-struct save_wave_msg {
-	void *buffer;
-	size_t size;
-	struct fs_file_t *audio_file;
-};
+// struct save_wave_msg {
+// 	void *buffer;
+// 	size_t size;
+// 	struct fs_file_t *audio_file;
+// };
 
-extern struct k_msgq audio_in_message_queue;
-
+struct k_msgq *audio_stream_get_msgq(void);
 //int pdm_init(AudioStream * audio_stream);
 
 //int capture_audio(AudioStream *audio_stream);

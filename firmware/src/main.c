@@ -27,10 +27,10 @@ int main(void)
 
     LOG_INF("Configured Buttons & Interrupts");
 
-	static struct fs_file_t wav_file;
+	static struct fs_file_t output_wav_file;
 
 	WavConfig output_wav_config = {
-			.wav_file = &wav_file,
+			.wav_file = &output_wav_file,
 			.file_name = "testy.wav",
 			.length = WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE,
 			.sample_rate = MAX_SAMPLE_RATE,
@@ -43,7 +43,7 @@ int main(void)
 		.output_wav_config = output_wav_config,
 		.dmic_ctx = DEVICE_DT_GET(DT_NODELABEL(pdm0)),
 		.pdm_gain = NRF_PDM_GAIN_MAXIMUM,
-		.msgq = &audio_in_message_queue,
+		.msgq = audio_stream_get_msgq(),
 	};
 
 	// AudioStream audio_stream = {
