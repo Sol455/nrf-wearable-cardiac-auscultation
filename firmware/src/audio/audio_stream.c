@@ -1,8 +1,11 @@
-#include "audio_stream.h"
-#include "audio_in.h"
 #include <zephyr/logging/log.h>
 #include <stdio.h>
+#include "audio_stream.h"
+#include "audio_in.h"
 #include "arm_math.h"
+#include "filters/bandpass_coeffs.h"
+#include "filters/lowpass_coeffs.h"
+
 
 #define MEM_SLAB_BLOCK_COUNT 8
 #define AUDIO_BUF_TOTAL_SIZE WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE
@@ -10,8 +13,72 @@
 LOG_MODULE_REGISTER(audio_stream);
 K_MSGQ_DEFINE(audio_input_message_queue, sizeof(audio_slab_msg), 8, 4);
 
-struct k_msgq *audio_stream_get_msgq(void) {
+struct k_msgq *audio_stream_get_msgq() {
     return &audio_input_message_queue;
+}
+
+float32_t bp_state[4 * NUM_STAGES_BP];
+arm_biquad_casd_df1_inst_f32 bp_inst;
+
+float32_t lp_state[4 * NUM_STAGES_LP];
+arm_biquad_casd_df1_inst_f32 lp_inst;
+
+void init_filters() {
+    arm_biquad_cascade_df1_init_f32(
+        &bp_inst,
+        NUM_STAGES_BP,
+        bandpass_coeffs,
+        bp_state
+    );
+    arm_biquad_cascade_df1_init_f32(
+        &lp_inst,
+        NUM_STAGES_LP,
+        lowpass_coeffs,
+        lp_state
+    );
+}
+
+void init_audio_stream() {
+    init_filters();
+}
+
+float32_t f32_buf[BLOCK_SIZE_SAMPLES];
+int16_t out_q15[BLOCK_SIZE_SAMPLES];
+
+void _process_block(audio_slab_msg *msg) {
+
+    int ret = 0;
+    #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
+        write_to_buffer(&msg);
+    #endif
+    arm_q15_to_float((int16_t *)msg->buffer, f32_buf, BLOCK_SIZE_SAMPLES); //Convert to F32
+    arm_biquad_cascade_df1_f32(&bp_inst, f32_buf, f32_buf, BLOCK_SIZE_SAMPLES); // Filter in place for now
+    arm_float_to_q15(f32_buf, out_q15, BLOCK_SIZE_SAMPLES); // Convert back to int for saving to file
+    ret = write_wav_data(msg->audio_output_file, (const char *)out_q15, msg->size); // write to wav file
+    k_mem_slab_free(audio_in_get_mem_slab(), msg->buffer);
+
+    if (ret != 0) {
+        LOG_ERR("Failed to write to file, rc=%d", ret);
+        return;
+    }
+}
+
+void consume_audio() {
+    audio_slab_msg msg;
+    int ret = 0;
+
+    while(1) {
+        if (k_msgq_get(&audio_input_message_queue, &msg, K_FOREVER) == 0) {
+            if (msg.msg_type == AUDIO_BLOCK_TYPE_DATA) {
+                //LOG_INF("Consumer: Received data %p\n", msg.buffer);
+                _process_block(&msg);
+            } else if (msg.msg_type == AUDIO_BLOCK_TYPE_STOP) {
+                audio_in_stop();
+            }
+
+            //LOG_INF("Written Data sucessfully");
+            }
+    }   
 }
 
 //Debug audio transmission config via BLE
@@ -45,32 +112,5 @@ void write_to_buffer(const audio_slab_msg *msg)
     LOG_INF("Wrote %u int16_t samples to audio_buf (offset now %u)", num_samples, audio_buf_offset);
 }
 #endif
-
-void consume_audio() {
-    audio_slab_msg msg;
-    int ret = 0;
-
-    while(1) {
-        if (k_msgq_get(&audio_input_message_queue, &msg, K_FOREVER) == 0) {
-            if (msg.msg_type == AUDIO_BLOCK_TYPE_DATA) {
-                LOG_INF("Consumer: Received data %p\n", msg.buffer);
-                #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
-                write_to_buffer(&msg);
-                #endif
-                //ret = write_wav_data(msg.audio_output_file, msg.buffer, msg.size);
-                //PROCESS AUDIO / DSP HERE:
-                //k_mem_slab_free(audio_in_get_mem_slab(), msg.buffer);
-                if (ret != 0) {
-                    LOG_ERR("Failed to write to file, rc=%d", ret);
-                    return;
-                }
-            } else if (msg.msg_type == AUDIO_BLOCK_TYPE_STOP) {
-                audio_in_stop();
-            }
-
-            LOG_INF("Written Data sucessfully");
-            }
-    }   
-}
 
 K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, consume_audio, NULL, NULL, NULL, 3, 0, 0);

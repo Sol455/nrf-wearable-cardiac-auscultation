@@ -1,5 +1,6 @@
 #include "audio_in.h"
 #include <zephyr/logging/log.h>
+#include <stdio.h>
 #include "../modules/sd_card.h"
 
 #define PDM_MEM_SLAB_BLOCK_COUNT 8
