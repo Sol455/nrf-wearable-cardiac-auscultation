@@ -2,6 +2,7 @@
 #include "audio_in.h"
 #include <zephyr/logging/log.h>
 #include <stdio.h>
+#include "arm_math.h"
 
 #define MEM_SLAB_BLOCK_COUNT 8
 #define AUDIO_BUF_TOTAL_SIZE WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE

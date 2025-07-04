@@ -18,3 +18,4 @@ target_sources(app PRIVATE src/audio/audio_in.c)
 
 target_sources(app PRIVATE src/ble/ble_manager.c)
 target_sources(app PRIVATE src/ble/heart_service.c)
+
