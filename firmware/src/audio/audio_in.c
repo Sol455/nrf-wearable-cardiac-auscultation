@@ -7,7 +7,7 @@
 LOG_MODULE_REGISTER(audio_in);
 
 K_MEM_SLAB_DEFINE(pdm_mem_slab, MAX_BLOCK_SIZE, PDM_MEM_SLAB_BLOCK_COUNT, 4); //align mem slab to 4 bytes
-int16_t wav_input_buffer[BLOCK_SIZE_SAMPLES];
+int16_t _wav_input_buffer[BLOCK_SIZE_SAMPLES];
 
 static AudioInConfig _audio_in_config; 
 
@@ -56,17 +56,12 @@ int pdm_init() {
     return 0;
 }
 
-void pdm_stop() {
+int pdm_stop() {
     int ret = dmic_trigger(_audio_in_config.dmic_ctx, DMIC_TRIGGER_STOP);
     if (ret < 0) {
         LOG_ERR("STOP trigger failed: %d", ret);
     }
-    if (_audio_in_config.audio_input_type == AUDIO_INPUT_TYPE_PDM_TO_WAV) {
-        ret = sd_card_close(_audio_in_config.output_wav_config.wav_file);
-        if (ret < 0) {
-        LOG_ERR("SD failed to close: %d", ret);
-        }
-    }
+    return ret;
 }
 
 int pdm_capture_audio() {
@@ -108,25 +103,26 @@ int pdm_capture_audio() {
     return ret;
 
 }
-
-void wav_file_capture_audio(AudioInConfig *audio_in_config, struct k_msgq *msgq) {
-    int samples_read = 1;
-    int block_count = 0;
+void wav_file_capture_audio() {
+    int block_count = 0, total_samples = 0, samples_read = 0, ret = 0;
     audio_slab_msg msg;
 
-    // while (samples_read  > 0) {
-    //     k_sem_take(&buf_done_sem, K_FOREVER);
-    //     samples_read = read_wav_block(wav_config, temp_wav_buffer, BLOCK_SIZE_SAMPLES);
-    //     msg.buffer = temp_wav_buffer;
-    //     msg.size = MAX_BLOCK_SIZE;
-    //     int ret = k_msgq_put(&device_message_queue, &msg, K_NO_WAIT);
-    //     block_count++;
-    //     LOG_INF("%d amples read \n", samples_read);
-    //     k_sem_give(&buf_ready_sem); 
+    while ((samples_read = read_wav_block(&_audio_in_config.input_wav_config,
+                                          _wav_input_buffer, BLOCK_SIZE_SAMPLES)) > 0) {
+        msg.msg_type = AUDIO_BLOCK_TYPE_DATA;
+        msg.buffer = _wav_input_buffer;
+        msg.size = samples_read * sizeof(int16_t);
 
-    // }
-    sd_card_close(audio_in_config->input_wav_config.wav_file);
-    LOG_INF("Processed %d blocks from WAV file\n", block_count);
+        ret = k_msgq_put(_audio_in_config.msgq, &msg, K_FOREVER);
+        block_count++;
+        total_samples += samples_read;
+        LOG_INF("Block %d: %d samples read, total: %d", block_count, samples_read, total_samples);
+        k_msleep(100);
+    }
+    // Send STOP message
+    audio_slab_msg stop_msg = { .msg_type = AUDIO_BLOCK_TYPE_STOP };
+    k_msgq_put(_audio_in_config.msgq, &stop_msg, K_FOREVER);
+    LOG_INF("Processed %d blocks, %d samples total from WAV file", block_count, total_samples);
 }
 
 void generate_wav_filename() {
@@ -146,7 +142,7 @@ int audio_in_init(AudioInConfig audio_in_config) {
             pdm_init();
             return -1;
         case AUDIO_INPUT_TYPE_WAV:
-            return open_wav_for_read(&_audio_in_config.input_wav_config);
+            return 0;
         default:
             LOG_ERR("Unknown audio input type!");
             return -1;
@@ -160,6 +156,7 @@ int audio_in_start() {
     switch (_audio_in_config.audio_input_type) {
         case AUDIO_INPUT_TYPE_PDM :
             ret = pdm_capture_audio();
+            break;
         case AUDIO_INPUT_TYPE_PDM_TO_WAV:
             generate_wav_filename();
             open_wav_for_write(&_audio_in_config.output_wav_config);
@@ -167,6 +164,8 @@ int audio_in_start() {
             break;
         case AUDIO_INPUT_TYPE_WAV:
             ret = open_wav_for_read(&_audio_in_config.input_wav_config);
+            wav_file_capture_audio();
+            break;
         default:
             LOG_ERR("Unknown audio input type!");
             return -1;
@@ -174,5 +173,28 @@ int audio_in_start() {
     return ret;
 }
 
-
+int audio_in_stop() {
+    int ret = 0;
+    switch (_audio_in_config.audio_input_type) {
+        case AUDIO_INPUT_TYPE_PDM:
+            ret = pdm_stop();
+            return ret;
+        case AUDIO_INPUT_TYPE_PDM_TO_WAV:
+            ret = pdm_stop();
+            ret = sd_card_close(_audio_in_config.output_wav_config.wav_file);
+            if (ret < 0) {
+                LOG_ERR("SD failed to close: %d", ret);
+            }
+            return ret;
+        case AUDIO_INPUT_TYPE_WAV:
+            ret = sd_card_close(_audio_in_config.input_wav_config.wav_file);
+            if (ret < 0) {
+                LOG_ERR("SD failed to close: %d", ret);
+            }
+            return ret;
+        default:
+            LOG_ERR("Unknown audio input type!");
+            return -1;
+    }
+}
 

@@ -31,15 +31,23 @@ int main(void)
 
 	WavConfig output_wav_config = {
 			.wav_file = &output_wav_file,
-			.file_name = "testy.wav",
+			.file_name = "test.wav",
 			.length = WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE,
 			.sample_rate = MAX_SAMPLE_RATE,
 			.bytes_per_sample = BYTES_PER_SAMPLE,
 			.num_channels = NUM_CHANNELS,
 	};
 
+	static struct fs_file_t input_wav_file;
+
+	WavConfig input_wav_config = {
+			.wav_file = &input_wav_file,
+			.file_name = "tri0.wav",
+	};
+
 	AudioInConfig audio_in_config = {
 		.audio_input_type = AUDIO_INPUT_TYPE_PDM_TO_WAV,
+		.input_wav_config = input_wav_config,
 		.output_wav_config = output_wav_config,
 		.dmic_ctx = DEVICE_DT_GET(DT_NODELABEL(pdm0)),
 		.pdm_gain = NRF_PDM_GAIN_MAXIMUM,

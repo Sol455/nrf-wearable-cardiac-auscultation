@@ -85,12 +85,14 @@ void _connect() {
     app_state = STATE_CONNECTED;
 }
 
-void _record_to_wav() {
+void _read_in_audio() {
     led_controller_start_blinking(K_MSEC(150));
     audio_in_start();
     #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
         _transmit_audio_ble();
     #endif
+    led_controller_stop_blinking();
+    led_controller_on();
 }
 
 // int _read_wav() {
@@ -140,17 +142,11 @@ static void handle_event(AppEvent evt)
             }
             //Record Audio to SD Card and then stream over BLE
             if (evt.type == EVENT_BLE_RECORD) {
-                _record_to_wav();
-                led_controller_stop_blinking();
-                led_controller_on();
+                _read_in_audio();
             }
             // if (evt.type = EVENT_BLE_DISCONNECTED) {
             //     app_state = STATE_IDLE;
             //     led_controller_off();
-            // }
-            // if (evt.type = EVENT_BLE_TOGGLE_LED) {
-            //     bool state = *(bool *)(evt.data);
-            //     led_controller_set(state);
             // }
             break;
 

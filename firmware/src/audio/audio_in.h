@@ -38,8 +38,6 @@ typedef struct {
 
 struct k_mem_slab *audio_in_get_mem_slab(void);
 int audio_in_init(AudioInConfig audio_in_config);
-int pdm_init();
-void pdm_stop();
 int audio_in_start();
-
+int audio_in_stop();
 #endif
