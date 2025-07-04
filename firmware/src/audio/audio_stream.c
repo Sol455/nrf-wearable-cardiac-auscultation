@@ -5,13 +5,15 @@
 #include "arm_math.h"
 #include "filters/bandpass_coeffs.h"
 #include "filters/lowpass_coeffs.h"
-
+#include "circular_block_buffer.h"
 
 #define MEM_SLAB_BLOCK_COUNT 8
 #define AUDIO_BUF_TOTAL_SIZE WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE
 
 LOG_MODULE_REGISTER(audio_stream);
 K_MSGQ_DEFINE(audio_input_message_queue, sizeof(audio_slab_msg), 8, 4);
+
+CircularBlockBuffer _block_buffer;
 
 struct k_msgq *audio_stream_get_msgq() {
     return &audio_input_message_queue;
@@ -40,6 +42,7 @@ void init_filters() {
 
 void init_audio_stream() {
     init_filters();
+    cbb_init(&_block_buffer, CB_NUM_BLOCKS, BLOCK_SIZE_SAMPLES);
 }
 
 float32_t f32_buf[BLOCK_SIZE_SAMPLES];
@@ -51,12 +54,14 @@ void _process_block(audio_slab_msg *msg) {
     #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
         write_to_buffer(&msg);
     #endif
+    float *block_to_write = cbb_get_write_block(&_block_buffer);
     arm_q15_to_float((int16_t *)msg->buffer, f32_buf, BLOCK_SIZE_SAMPLES); //Convert to F32
-    arm_biquad_cascade_df1_f32(&bp_inst, f32_buf, f32_buf, BLOCK_SIZE_SAMPLES); // Filter in place for now
-    arm_float_to_q15(f32_buf, out_q15, BLOCK_SIZE_SAMPLES); // Convert back to int for saving to file
-    ret = write_wav_data(msg->audio_output_file, (const char *)out_q15, msg->size); // write to wav file
-    k_mem_slab_free(audio_in_get_mem_slab(), msg->buffer);
+    arm_biquad_cascade_df1_f32(&bp_inst, f32_buf, block_to_write, BLOCK_SIZE_SAMPLES); // Filter into slab buffer
 
+    // arm_float_to_q15(f32_buf, out_q15, BLOCK_SIZE_SAMPLES); // Convert back to int for saving to file
+    // ret = write_wav_data(msg->audio_output_file, (const char *)out_q15, msg->size); // write to wav file
+    //k_mem_slab_free(audio_in_get_mem_slab(), msg->buffer);
+    cbb_advance_write_index(&_block_buffer);
     if (ret != 0) {
         LOG_ERR("Failed to write to file, rc=%d", ret);
         return;
@@ -70,7 +75,7 @@ void consume_audio() {
     while(1) {
         if (k_msgq_get(&audio_input_message_queue, &msg, K_FOREVER) == 0) {
             if (msg.msg_type == AUDIO_BLOCK_TYPE_DATA) {
-                //LOG_INF("Consumer: Received data %p\n", msg.buffer);
+                LOG_INF("Consumer: Received data %p\n", msg.buffer);
                 _process_block(&msg);
             } else if (msg.msg_type == AUDIO_BLOCK_TYPE_STOP) {
                 audio_in_stop();

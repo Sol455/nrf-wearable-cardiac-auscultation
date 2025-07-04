@@ -5,7 +5,7 @@
 #include <zephyr/kernel.h>
 
 typedef struct {
-    float buffer[CB_NUM_BLOCKS][MAX_BLOCK_SIZE];
+    float buffer[CB_NUM_BLOCKS][BLOCK_SIZE_SAMPLES];
     uint32_t num_blocks;
     uint32_t block_size;
     uint32_t write_index;
