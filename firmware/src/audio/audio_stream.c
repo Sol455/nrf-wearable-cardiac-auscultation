@@ -56,9 +56,9 @@ void consume_audio() {
                 #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
                 write_to_buffer(&msg);
                 #endif
-                ret = write_wav_data(msg.audio_output_file, msg.buffer, msg.size);
+                //ret = write_wav_data(msg.audio_output_file, msg.buffer, msg.size);
                 //PROCESS AUDIO / DSP HERE:
-                k_mem_slab_free(audio_in_get_mem_slab(), msg.buffer);
+                //k_mem_slab_free(audio_in_get_mem_slab(), msg.buffer);
                 if (ret != 0) {
                     LOG_ERR("Failed to write to file, rc=%d", ret);
                     return;

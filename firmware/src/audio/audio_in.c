@@ -117,7 +117,8 @@ void wav_file_capture_audio() {
         block_count++;
         total_samples += samples_read;
         LOG_INF("Block %d: %d samples read, total: %d", block_count, samples_read, total_samples);
-        k_msleep(100);
+        uint32_t block_ms = (samples_read * 1000) / _audio_in_config.input_wav_config.sample_rate;
+        k_msleep(block_ms);
     }
     // Send STOP message
     audio_slab_msg stop_msg = { .msg_type = AUDIO_BLOCK_TYPE_STOP };
