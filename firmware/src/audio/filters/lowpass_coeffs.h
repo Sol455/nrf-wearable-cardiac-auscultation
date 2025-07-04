@@ -2,7 +2,7 @@
 #ifndef LOWPASS_COEFFS_H
 #define LOWPASS_COEFFS_H
 
-#define NUM_STAGES_LP (1)
+#define NUM_STAGES_LP 1
 
 float lowpass_coeffs[] = {
     0.00000649,
