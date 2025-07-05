@@ -2,22 +2,17 @@
 
 LOG_MODULE_REGISTER(rt_peak_detector);
 
-void rt_peak_detector_init(RTPeakDetector *det,
-                           uint32_t block_size,
-                           uint32_t num_blocks,
-                           float alpha,
-                           float threshold_scale,
-                           uint32_t min_distance)
+void rt_peak_detector_init(RTPeakDetector *det, RTPeakConfig *rt_peak_config)
 {
-    det->block_size = block_size;
-    det->num_blocks = num_blocks;
+    det->block_size = rt_peak_config->block_size;
+    det->num_blocks = rt_peak_config->num_blocks;
     for (int i = 0; i < 3; ++i)
         det->samples[i] = 0.0f;
     det->index = 0;
     det->running_mean = 0.0f;
-    det->alpha = alpha;
-    det->threshold_scale = threshold_scale;
-    det->min_distance = min_distance;
+    det->alpha = rt_peak_config->alpha;
+    det->threshold_scale = rt_peak_config->threshold_scale;
+    det->min_distance = rt_peak_config->min_distance_samples;
     det->samples_since_peak = UINT32_MAX;
 }
 

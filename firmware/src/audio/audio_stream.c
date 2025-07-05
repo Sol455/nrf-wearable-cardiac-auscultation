@@ -6,7 +6,6 @@
 #include "dsp/filters/bandpass_coeffs.h"
 #include "dsp/filters/lowpass_coeffs.h"
 #include "dsp/circular_block_buffer.h"
-#include "dsp/rt_peak_detector.h"
 
 #define MEM_SLAB_BLOCK_COUNT 8
 #define AUDIO_BUF_TOTAL_SIZE WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE
@@ -14,9 +13,10 @@
 LOG_MODULE_REGISTER(audio_stream);
 K_MSGQ_DEFINE(audio_input_message_queue, sizeof(audio_slab_msg), 8, 4);
 
+AudioStreamConfig _audio_stream_config;
+
 CircularBlockBuffer _block_buffer;
 RTPeakDetector _rt_peak_detector;
-
 
 struct k_msgq *audio_stream_get_msgq() {
     return &audio_input_message_queue;
@@ -43,10 +43,12 @@ void init_filters() {
     );
 }
 
-void init_audio_stream() {
+void init_audio_stream(AudioStreamConfig audio_stream_config) {
+    _audio_stream_config = audio_stream_config;
     init_filters();
     cbb_init(&_block_buffer, CB_NUM_BLOCKS, BLOCK_SIZE_SAMPLES);
-    rt_peak_detector_init(&_rt_peak_detector, BLOCK_SIZE_SAMPLES, CB_NUM_BLOCKS, 0.0001, 2.0, 2000);
+    //rt_peak_detector_init(&_rt_peak_detector, BLOCK_SIZE_SAMPLES, CB_NUM_BLOCKS, 0.0001, 2.0, 2000);
+    rt_peak_detector_init(&_rt_peak_detector, &_audio_stream_config.rt_peak_config);
 }
 
 float32_t f32_buf[BLOCK_SIZE_SAMPLES];

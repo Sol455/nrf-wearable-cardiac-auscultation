@@ -5,6 +5,14 @@
 #include <stdbool.h>
 #include <zephyr/logging/log.h>
 
+typedef struct {
+    uint32_t block_size;   
+    uint32_t num_blocks;   
+    float alpha;
+    float threshold_scale;
+    uint32_t min_distance_samples;        
+} RTPeakConfig;
+
 typedef enum {
     RT_PEAK_UNVAL,
     RT_PEAK_S1,
@@ -29,12 +37,7 @@ typedef struct {
     uint32_t samples_since_peak;
 } RTPeakDetector;
 
-void rt_peak_detector_init(RTPeakDetector *det,
-                           uint32_t block_size,
-                           uint32_t num_blocks,
-                           float alpha,
-                           float threshold_scale,
-                           uint32_t min_distance);
+void rt_peak_detector_init(RTPeakDetector *det, RTPeakConfig *rt_peak_config);
 
 bool rt_peak_detector_update(RTPeakDetector *det,
                              float x,

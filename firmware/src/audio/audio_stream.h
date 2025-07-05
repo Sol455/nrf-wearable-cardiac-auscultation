@@ -7,12 +7,14 @@
 #include "wav_file.h"
 #include <nrfx_pdm.h>
 #include "../macros.h"
+#include "dsp/rt_peak_detector.h"
 
 typedef struct {
     struct k_mem_slab *mem_slab; 
+    RTPeakConfig rt_peak_config;
 } AudioStreamConfig;
 
-void init_audio_stream();
+void init_audio_stream(AudioStreamConfig audio_stream_config);
 
 struct k_msgq *audio_stream_get_msgq();
 void consume_audio();

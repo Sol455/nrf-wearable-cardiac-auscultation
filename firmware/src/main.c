@@ -12,6 +12,8 @@
 #include "macros.h"
 #include "event_handler.h"
 #include "ble/ble_manager.h"
+#include "audio/dsp/rt_peak_detector.h"
+#include "audio/dsp/circular_block_buffer.h"
 
 LOG_MODULE_REGISTER(main);
 
@@ -54,11 +56,17 @@ int main(void)
 		.msgq = audio_stream_get_msgq(),
 	};
 
-	// AudioStream audio_stream = {
-	// 	.wav_config = wav_config,
-	// 	.dmic_ctx = DEVICE_DT_GET(DT_NODELABEL(pdm0)),
-	// 	.pdm_gain = NRF_PDM_GAIN_MAXIMUM
-	// };
+	RTPeakConfig rt_peak_config = {
+		.block_size = BLOCK_SIZE_SAMPLES,   
+		.num_blocks = CB_NUM_BLOCKS,   
+		.alpha = 0.0001,
+		.threshold_scale = 2.0,
+		.min_distance_samples = 2000,        
+	};
+
+	AudioStreamConfig audio_stream_config = {
+		.rt_peak_config = rt_peak_config,
+	};
 
     LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
 
@@ -71,7 +79,7 @@ int main(void)
 	ret = ble_init();
 	if(ret!=0) LOG_ERR("BLE Failed to init");
 
-	init_audio_stream();
+	init_audio_stream(audio_stream_config);
 
     //event_handler_set_audio_stream(&audio_stream);
 
