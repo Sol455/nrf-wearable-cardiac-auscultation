@@ -87,15 +87,13 @@ void _process_block(audio_slab_msg *msg) {
 
     //3. Peak Detection
     int32_t block_absolute_start = cbb_get_absolute_sample_index(&_block_buffer) - cbb_get_block_size(&_block_buffer);
-    //LOG_INF("Block start absolute idx: %d", block_absolute_start);
 
     for (int i = 0; i < BLOCK_SIZE_SAMPLES; i++) {
-
         int32_t abs_idx_of_sample = block_absolute_start + i;
         RTPeakMessage peak_msg;
         bool found = rt_peak_detector_update(&_rt_peak_detector, envelope_buf[i], abs_idx_of_sample, &peak_msg);
         if (found) {
-            rt_peak_validator_notify_peak(&_rt_peak_validator, peak_msg);
+            ret = rt_peak_validator_notify_peak(&_rt_peak_validator, peak_msg);
             debug_peak_count++;
             LOG_INF("Peak at global idx %d, value %f, running peak_total: %d", peak_msg.global_index, (double)peak_msg.value, debug_peak_count);
         }
@@ -132,9 +130,12 @@ void process_peaks() {
     int ret = 0;
 
     while(1) {
-        if (k_msgq_get(&peak_message_queue, &msg, K_FOREVER) == 0) {
-            LOG_INF("Got peak type %d", msg.type);
-            //do something
+        ret = k_msgq_get(&peak_message_queue, &msg, K_FOREVER);
+        if (ret == 0) {
+            LOG_INF("process_peaks: Got peak type %d, global_index %d", msg.type, msg.global_index);
+            // Process the message
+        } else {
+            LOG_ERR("process_peaks: k_msgq_get error %d", ret);
         }
     }   
 }

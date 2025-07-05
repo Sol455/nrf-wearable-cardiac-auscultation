@@ -68,7 +68,7 @@ int main(void)
 		.close_r = 0.45,
 		.far_r = 0.55,
 		.margin = 0.05,
-		.peak_msgq = audio_stream_get_msgq()
+		.peak_msgq = audio_stream_get_peak_msgq()
 	};
 
 	AudioStreamConfig audio_stream_config = {

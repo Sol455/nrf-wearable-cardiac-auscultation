@@ -68,7 +68,7 @@ int rt_peak_validator_notify_peak(RTPeakValidator* peak_validator, RTPeakMessage
     }
     int ret = k_msgq_put(peak_validator->peak_msgq, p1, K_NO_WAIT);
     if (ret != 0) {
-        LOG_INF("peak_validator: Failed to put message: global_index=%d type=%d, k_msgq_put returned %d", p1->global_index, p1->type, ret);
+        LOG_ERR("peak_validator: Failed to put message: global_index=%d type=%d, k_msgq_put returned %d", p1->global_index, p1->type, ret);
     }
     return ret;
 }
