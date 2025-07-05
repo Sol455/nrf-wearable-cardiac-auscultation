@@ -215,7 +215,7 @@ def populate_window_features(window_event, peaks, window, fs, s_window_size):
         peak_index = peak['audio_index']
         s_window = extract_fixed_window(window, peak_index, s_window_size)
         rms = calc_rms(s_window)
-        print(f"rms: {rms}")
+        #print(f"rms: {rms}")
         freqs, Y_dB, spectral_centroid = calc_centroid(s_window, fs)
         if peak['type'] == 'S1':
             window_event["S1_rms"] = rms

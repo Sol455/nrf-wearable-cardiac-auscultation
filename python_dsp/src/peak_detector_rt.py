@@ -36,8 +36,7 @@ class PeakDetectorNPoint:
         peak_value = None
         sample_index = None
 
-        if (mid > threshold and mid > prev and mid > next and
-                self.samples_since_peak >= self.min_distance):
+        if (mid >= threshold and mid >= prev and mid >= next and (mid > prev or mid > next) and self.samples_since_peak >= self.min_distance):
             is_peak = True
             peak_value = mid
             self.samples_since_peak = 0
@@ -52,7 +51,7 @@ class PeakDetectorNPoint:
             message = {
                 "sample_index": sample_index,
                 "value": peak_value,
-                "global_index": dbg_global_index,
+                "global_index": dbg_global_index - 1,
                 "type": "unval"
             }
             return message

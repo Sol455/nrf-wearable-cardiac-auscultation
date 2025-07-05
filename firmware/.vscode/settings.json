@@ -24,7 +24,16 @@
         "vector": "c",
         "circular_block_buffer.h": "c",
         "audio_in.h": "c",
-        "nrfx_pdm.h": "c"
+        "nrfx_pdm.h": "c",
+        "compare": "c",
+        "bandpass_coeffs.h": "c",
+        "ratio": "c",
+        "system_error": "c",
+        "array": "c",
+        "functional": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c"
     },
     "nrf-connect.applications": [
         "${workspaceFolder}"

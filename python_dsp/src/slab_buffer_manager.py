@@ -50,7 +50,7 @@ class SlabBuffer:
     
     
     def get_window(self, start_abs_idx, end_abs_idx):
-        print("attempting to get window")
+        #print("attempting to get window")
         window_len = end_abs_idx - start_abs_idx
         if window_len <= 0:
             raise ValueError("Invalid window length")
@@ -65,7 +65,7 @@ class SlabBuffer:
         return window
     
     def extract_window(self, start_idx, end_idx, pre, post, return_none_if_too_old=True):
-        print("attempting to extract window")
+        #print("attempting to extract window")
         start = start_idx - pre
         end = end_idx + post
         latest = self.get_latest_absolute_sample_index()
