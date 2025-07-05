@@ -10,8 +10,12 @@
 #define MEM_SLAB_BLOCK_COUNT 8
 #define AUDIO_BUF_TOTAL_SIZE WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE
 
+#define PEAK_PROCESSING_STACK_SIZE CONFIG_MAIN_STACK_SIZE
+#define PEAK_PROCESSING_PRIORITY 5
+
 LOG_MODULE_REGISTER(audio_stream);
 K_MSGQ_DEFINE(audio_input_message_queue, sizeof(audio_slab_msg), 8, 4);
+K_MSGQ_DEFINE(peak_message_queue, sizeof(audio_slab_msg), 8, 4);
 
 AudioStreamConfig _audio_stream_config;
 
@@ -20,6 +24,10 @@ RTPeakDetector _rt_peak_detector;
 
 struct k_msgq *audio_stream_get_msgq() {
     return &audio_input_message_queue;
+}
+
+struct k_msgq *audio_stream_get_peak_msgq() {
+    return &peak_message_queue;
 }
 
 float32_t bp_state[4 * NUM_STAGES_BP];
@@ -117,6 +125,17 @@ void consume_audio() {
     }   
 }
 
+void process_peaks() {
+    audio_slab_msg msg;
+    int ret = 0;
+
+    while(1) {
+        if (k_msgq_get(&peak_message_queue, &msg, K_FOREVER) == 0) {
+            //do something
+        }
+    }   
+}
+
 //Debug audio transmission config via BLE
 #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
 static int16_t audio_buf[AUDIO_BUF_TOTAL_SIZE];
@@ -150,3 +169,5 @@ void write_to_buffer(const audio_slab_msg *msg)
 #endif
 
 K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, consume_audio, NULL, NULL, NULL, 3, 0, 0);
+
+K_THREAD_DEFINE(peak_processing_thread_id, PEAK_PROCESSING_STACK_SIZE, process_peaks,  NULL, NULL, NULL, PEAK_PROCESSING_PRIORITY, 0, 0);

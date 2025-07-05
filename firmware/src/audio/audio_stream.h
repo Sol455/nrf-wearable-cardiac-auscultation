@@ -17,6 +17,7 @@ typedef struct {
 void init_audio_stream(AudioStreamConfig audio_stream_config);
 
 struct k_msgq *audio_stream_get_msgq();
+struct k_msgq *audio_stream_get_peak_msgq();
 void consume_audio();
 
 //Audio Transmission Functions
