@@ -47,6 +47,7 @@ void init_audio_stream() {
 
 float32_t f32_buf[BLOCK_SIZE_SAMPLES];
 int16_t out_q15[BLOCK_SIZE_SAMPLES];
+float32_t envelope_buf[BLOCK_SIZE_SAMPLES];
 
 void _process_block(audio_slab_msg *msg) {
 
@@ -54,12 +55,20 @@ void _process_block(audio_slab_msg *msg) {
     #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
         write_to_buffer(&msg);
     #endif
+    //1. Write filtered audio to ring buffer
     float *block_to_write = cbb_get_write_block(&_block_buffer);
     arm_q15_to_float((int16_t *)msg->buffer, f32_buf, BLOCK_SIZE_SAMPLES); //Convert to F32
     arm_biquad_cascade_df1_f32(&bp_inst, f32_buf, block_to_write, BLOCK_SIZE_SAMPLES); // Filter into slab buffer
 
     // arm_float_to_q15(f32_buf, out_q15, BLOCK_SIZE_SAMPLES); // Convert back to int for saving to file
     // ret = write_wav_data(msg->audio_output_file, (const char *)out_q15, msg->size); // write to wav file
+
+    //2. Generate envelope
+    arm_abs_f32(block_to_write, envelope_buf, BLOCK_SIZE_SAMPLES);
+    arm_biquad_cascade_df1_f32(&lp_inst, envelope_buf, envelope_buf, BLOCK_SIZE_SAMPLES);
+
+    //3. Peak Detection
+
     //k_mem_slab_free(audio_in_get_mem_slab(), msg->buffer);
     cbb_advance_write_index(&_block_buffer);
     if (ret != 0) {
