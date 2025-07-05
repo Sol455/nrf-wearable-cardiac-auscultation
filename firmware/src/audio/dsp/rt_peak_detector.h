@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <zephyr/logging/log.h>
 
 typedef enum {
     RT_PEAK_UNVAL,

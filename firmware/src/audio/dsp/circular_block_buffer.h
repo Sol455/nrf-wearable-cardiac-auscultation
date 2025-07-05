@@ -1,7 +1,7 @@
 #ifndef _CIRCULAR_BLOCK_BUFFER_H_
 #define _CIRCULAR_BLOCK_BUFFER_H_
 
-#include "../macros.h"
+#include "../../macros.h"
 #include <zephyr/kernel.h>
 
 typedef struct {

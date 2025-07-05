@@ -117,7 +117,7 @@ void wav_file_capture_audio() {
         ret = k_msgq_put(_audio_in_config.msgq, &msg, K_FOREVER);
         block_count++;
         total_samples += samples_read;
-        LOG_INF("Block %d: %d samples read, total: %d", block_count, samples_read, total_samples);
+        //LOG_INF("Block %d: %d samples read, total: %d", block_count, samples_read, total_samples);
         uint32_t block_ms = (samples_read * 1000) / _audio_in_config.input_wav_config.sample_rate;
         k_msleep(block_ms);
     }

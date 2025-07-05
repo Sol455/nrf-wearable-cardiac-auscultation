@@ -1,5 +1,7 @@
 #include "rt_peak_detector.h"
 
+LOG_MODULE_REGISTER(rt_peak_detector);
+
 void rt_peak_detector_init(RTPeakDetector *det,
                            uint32_t block_size,
                            uint32_t num_blocks,
@@ -38,7 +40,7 @@ bool rt_peak_detector_update(RTPeakDetector *det,
 
     bool is_peak = false;
 
-    if (mid > threshold && mid > prev && mid > next && det->samples_since_peak >= det->min_distance) {
+    if (mid > threshold && mid >= prev && mid >= next && (mid > prev || mid > next) && det->samples_since_peak >= det->min_distance){
         is_peak = true;
         det->samples_since_peak = 0;
     } else {

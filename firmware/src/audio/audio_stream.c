@@ -3,9 +3,10 @@
 #include "audio_stream.h"
 #include "audio_in.h"
 #include "arm_math.h"
-#include "filters/bandpass_coeffs.h"
-#include "filters/lowpass_coeffs.h"
-#include "circular_block_buffer.h"
+#include "dsp/filters/bandpass_coeffs.h"
+#include "dsp/filters/lowpass_coeffs.h"
+#include "dsp/circular_block_buffer.h"
+#include "dsp/rt_peak_detector.h"
 
 #define MEM_SLAB_BLOCK_COUNT 8
 #define AUDIO_BUF_TOTAL_SIZE WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE
@@ -14,6 +15,8 @@ LOG_MODULE_REGISTER(audio_stream);
 K_MSGQ_DEFINE(audio_input_message_queue, sizeof(audio_slab_msg), 8, 4);
 
 CircularBlockBuffer _block_buffer;
+RTPeakDetector _rt_peak_detector;
+
 
 struct k_msgq *audio_stream_get_msgq() {
     return &audio_input_message_queue;
@@ -43,11 +46,14 @@ void init_filters() {
 void init_audio_stream() {
     init_filters();
     cbb_init(&_block_buffer, CB_NUM_BLOCKS, BLOCK_SIZE_SAMPLES);
+    rt_peak_detector_init(&_rt_peak_detector, BLOCK_SIZE_SAMPLES, CB_NUM_BLOCKS, 0.0001, 2.0, 2000);
 }
 
 float32_t f32_buf[BLOCK_SIZE_SAMPLES];
 int16_t out_q15[BLOCK_SIZE_SAMPLES];
 float32_t envelope_buf[BLOCK_SIZE_SAMPLES];
+
+int debug_peak_count = 0;
 
 void _process_block(audio_slab_msg *msg) {
 
@@ -59,6 +65,7 @@ void _process_block(audio_slab_msg *msg) {
     float *block_to_write = cbb_get_write_block(&_block_buffer);
     arm_q15_to_float((int16_t *)msg->buffer, f32_buf, BLOCK_SIZE_SAMPLES); //Convert to F32
     arm_biquad_cascade_df1_f32(&bp_inst, f32_buf, block_to_write, BLOCK_SIZE_SAMPLES); // Filter into slab buffer
+    cbb_advance_write_index(&_block_buffer); //Advance slab buffer index for next run
 
     // arm_float_to_q15(f32_buf, out_q15, BLOCK_SIZE_SAMPLES); // Convert back to int for saving to file
     // ret = write_wav_data(msg->audio_output_file, (const char *)out_q15, msg->size); // write to wav file
@@ -68,9 +75,22 @@ void _process_block(audio_slab_msg *msg) {
     arm_biquad_cascade_df1_f32(&lp_inst, envelope_buf, envelope_buf, BLOCK_SIZE_SAMPLES);
 
     //3. Peak Detection
+    int32_t block_absolute_start = cbb_get_absolute_sample_index(&_block_buffer) - cbb_get_block_size(&_block_buffer);
+    //LOG_INF("Block start absolute idx: %d", block_absolute_start);
+
+    for (int i = 0; i < BLOCK_SIZE_SAMPLES; i++) {
+
+        int32_t abs_idx_of_sample = block_absolute_start + i;
+        RTPeakMessage peak_msg;
+        bool found = rt_peak_detector_update(&_rt_peak_detector, envelope_buf[i], abs_idx_of_sample, &peak_msg);
+        if (found) {
+            debug_peak_count++;
+            LOG_INF("Peak at global idx %d, value %f, running peak_total: %d", peak_msg.global_index, (double)peak_msg.value, debug_peak_count);
+        }
+    }
+
 
     //k_mem_slab_free(audio_in_get_mem_slab(), msg->buffer);
-    cbb_advance_write_index(&_block_buffer);
     if (ret != 0) {
         LOG_ERR("Failed to write to file, rc=%d", ret);
         return;
@@ -84,7 +104,7 @@ void consume_audio() {
     while(1) {
         if (k_msgq_get(&audio_input_message_queue, &msg, K_FOREVER) == 0) {
             if (msg.msg_type == AUDIO_BLOCK_TYPE_DATA) {
-                LOG_INF("Consumer: Received data %p\n", msg.buffer);
+                //LOG_INF("Consumer: Received data %p\n", msg.buffer);
                 _process_block(&msg);
             } else if (msg.msg_type == AUDIO_BLOCK_TYPE_STOP) {
                 audio_in_stop();

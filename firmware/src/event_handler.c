@@ -124,12 +124,13 @@ static void handle_event(AppEvent evt)
     switch (app_state) {
         case STATE_IDLE:
             if (evt.type == EVENT_BUTTON_0_PRESS) {
-                _advertise();
+                _read_in_audio();
+                //_advertise();
             }
             break;
         case STATE_ADVERTISING:
             if (evt.type == EVENT_BLE_CONNECTED) {
-                _connect();
+                //_connect();
             }
             break;
 
