@@ -64,8 +64,16 @@ int main(void)
 		.min_distance_samples = 2000,        
 	};
 
+	RTPeakValConfig rt_peak_val_config = {
+		.close_r = 0.45,
+		.far_r = 0.55,
+		.margin = 0.05,
+		.peak_msgq = audio_stream_get_msgq()
+	};
+
 	AudioStreamConfig audio_stream_config = {
 		.rt_peak_config = rt_peak_config,
+		.rt_peak_val_config = rt_peak_val_config
 	};
 
     LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);

@@ -24,10 +24,10 @@ typedef struct {
     struct k_msgq *peak_msgq;
 } RTPeakValidator;
 
-void peak_validator_init(RTPeakValidator* peak_validator, RTPeakValConfig *peak_validator_conf);
+void rt_peak_validator_init(RTPeakValidator* peak_validator, RTPeakValConfig *peak_validator_conf);
 
-void peak_validator_update(RTPeakValidator* peak_validator);
+void rt_peak_validator_update(RTPeakValidator* peak_validator);
 
-int peak_validator_notify_peak(RTPeakValidator* peak_validator, RTPeakMessage new_peak);
+int rt_peak_validator_notify_peak(RTPeakValidator* peak_validator, RTPeakMessage new_peak);
 
 #endif

@@ -3,7 +3,7 @@
 
 LOG_MODULE_REGISTER(peak_validator);
 
-void peak_validator_init(RTPeakValidator* peak_validator, RTPeakValConfig *peak_validator_conf) {
+void rt_peak_validator_init(RTPeakValidator* peak_validator, RTPeakValConfig *peak_validator_conf) {
     peak_validator->write_idx = 0;
     peak_validator->valid_count = 0;
     peak_validator->counter_since_last_peak = 0;
@@ -13,11 +13,11 @@ void peak_validator_init(RTPeakValidator* peak_validator, RTPeakValConfig *peak_
     peak_validator->peak_msgq = peak_validator_conf->peak_msgq;
 }
 
-void peak_validator_update(RTPeakValidator* peak_validator) {
+void rt_peak_validator_update(RTPeakValidator* peak_validator) {
     peak_validator->counter_since_last_peak += 1;
 }
 
-int peak_validator_notify_peak(RTPeakValidator* peak_validator, RTPeakMessage new_peak) {
+int rt_peak_validator_notify_peak(RTPeakValidator* peak_validator, RTPeakMessage new_peak) {
     peak_validator->buffer[peak_validator->write_idx] = new_peak;
     peak_validator->write_idx = (peak_validator->write_idx + 1) % PEAK_BUF_SIZE;
     peak_validator->counter_since_last_peak = 0;
@@ -25,7 +25,6 @@ int peak_validator_notify_peak(RTPeakValidator* peak_validator, RTPeakMessage ne
     //Start -up logic
     if (peak_validator->valid_count < PEAK_BUF_SIZE)
         peak_validator->valid_count++;
-
     if (peak_validator->valid_count < PEAK_BUF_SIZE)
         return 0; // Not enough peaks yet
 

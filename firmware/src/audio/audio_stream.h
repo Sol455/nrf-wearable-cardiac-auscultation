@@ -8,10 +8,12 @@
 #include <nrfx_pdm.h>
 #include "../macros.h"
 #include "dsp/rt_peak_detector.h"
+#include "dsp/peak_validator.h"
 
 typedef struct {
     struct k_mem_slab *mem_slab; 
     RTPeakConfig rt_peak_config;
+    RTPeakValConfig rt_peak_val_config;
 } AudioStreamConfig;
 
 void init_audio_stream(AudioStreamConfig audio_stream_config);

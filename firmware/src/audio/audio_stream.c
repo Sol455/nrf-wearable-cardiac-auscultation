@@ -21,6 +21,7 @@ AudioStreamConfig _audio_stream_config;
 
 CircularBlockBuffer _block_buffer;
 RTPeakDetector _rt_peak_detector;
+RTPeakValidator _rt_peak_validator;
 
 struct k_msgq *audio_stream_get_msgq() {
     return &audio_input_message_queue;
@@ -55,8 +56,8 @@ void init_audio_stream(AudioStreamConfig audio_stream_config) {
     _audio_stream_config = audio_stream_config;
     init_filters();
     cbb_init(&_block_buffer, CB_NUM_BLOCKS, BLOCK_SIZE_SAMPLES);
-    //rt_peak_detector_init(&_rt_peak_detector, BLOCK_SIZE_SAMPLES, CB_NUM_BLOCKS, 0.0001, 2.0, 2000);
     rt_peak_detector_init(&_rt_peak_detector, &_audio_stream_config.rt_peak_config);
+    rt_peak_validator_init(&_rt_peak_validator, &_audio_stream_config.rt_peak_val_config);
 }
 
 float32_t f32_buf[BLOCK_SIZE_SAMPLES];
@@ -94,6 +95,7 @@ void _process_block(audio_slab_msg *msg) {
         RTPeakMessage peak_msg;
         bool found = rt_peak_detector_update(&_rt_peak_detector, envelope_buf[i], abs_idx_of_sample, &peak_msg);
         if (found) {
+            rt_peak_validator_notify_peak(&_rt_peak_validator, peak_msg);
             debug_peak_count++;
             LOG_INF("Peak at global idx %d, value %f, running peak_total: %d", peak_msg.global_index, (double)peak_msg.value, debug_peak_count);
         }
@@ -131,6 +133,7 @@ void process_peaks() {
 
     while(1) {
         if (k_msgq_get(&peak_message_queue, &msg, K_FOREVER) == 0) {
+            LOG_INF("Got peak type %d", msg.type);
             //do something
         }
     }   
