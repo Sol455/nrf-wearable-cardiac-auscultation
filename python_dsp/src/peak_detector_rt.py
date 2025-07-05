@@ -13,10 +13,6 @@ class PeakDetectorNPoint:
         self.min_distance = min_distance
         self.samples_since_peak = float('inf')  # so it can trigger immediately
 
-    def calc_global_index(self, epoch, slab_index, sample_index):
-        global_index =  (epoch * self.num_blocks + slab_index) * self.block_size + sample_index
-        return global_index
-
     def update(self, x, sample_index_in_block, dbg_global_index, use_external_mean=False, external_mean=0):
 
         if use_external_mean:
@@ -38,7 +34,6 @@ class PeakDetectorNPoint:
 
         is_peak = False
         peak_value = None
-        slab_index = None
         sample_index = None
 
         if (mid > threshold and mid > prev and mid > next and
@@ -51,23 +46,9 @@ class PeakDetectorNPoint:
 
         self.index = (self.index + 1) % 3  # Rotate circular buffer
 
-            #         epoch = current_epoch
-            # slab_index = current_slab_index
-            # sample_index = sample_index_in_block - 1  # as mid is x[n-1]
-
         if is_peak:
-                # By default, assume peak is in current block
-            # epoch = current_epoch
-            # slab_index = current_slab_index
             sample_index = sample_index_in_block - 1  # as mid is x[n-1]
 
-            # # If peak is actually in previous block:
-            # if sample_index < 0:
-            #     sample_index += self.block_size  # move to last sample of previous block
-            #     slab_index = (slab_index - 1) % self.num_blocks  # wrap around if needed
-            #     if slab_index == self.num_blocks - 1:
-            #         epoch -= 1  # we've wrapped to previous epoch!
-            #    print("peak roundback")
             message = {
                 "sample_index": sample_index,
                 "value": peak_value,
