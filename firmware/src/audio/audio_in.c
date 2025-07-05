@@ -114,7 +114,7 @@ void wav_file_capture_audio() {
         msg.buffer = _wav_input_buffer;
         msg.size = samples_read * sizeof(int16_t);
 
-        ret = k_msgq_put(_audio_in_config.msgq, &msg, K_FOREVER);
+        ret = k_msgq_put(_audio_in_config.msgq, &msg, K_NO_WAIT);
         block_count++;
         total_samples += samples_read;
         //LOG_INF("Block %d: %d samples read, total: %d", block_count, samples_read, total_samples);

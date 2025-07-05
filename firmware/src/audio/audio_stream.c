@@ -15,7 +15,7 @@
 
 LOG_MODULE_REGISTER(audio_stream);
 K_MSGQ_DEFINE(audio_input_message_queue, sizeof(audio_slab_msg), 8, 4);
-K_MSGQ_DEFINE(peak_message_queue, sizeof(audio_slab_msg), 8, 4);
+K_MSGQ_DEFINE(peak_message_queue, sizeof(RTPeakMessage), 8, 4);
 
 AudioStreamConfig _audio_stream_config;
 
@@ -125,8 +125,8 @@ void consume_audio() {
     }   
 }
 
-void process_peaks() {
-    audio_slab_msg msg;
+void process_peaks() { 
+    RTPeakMessage msg;
     int ret = 0;
 
     while(1) {
@@ -169,5 +169,4 @@ void write_to_buffer(const audio_slab_msg *msg)
 #endif
 
 K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, consume_audio, NULL, NULL, NULL, 3, 0, 0);
-
 K_THREAD_DEFINE(peak_processing_thread_id, PEAK_PROCESSING_STACK_SIZE, process_peaks,  NULL, NULL, NULL, PEAK_PROCESSING_PRIORITY, 0, 0);

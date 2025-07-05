@@ -16,7 +16,7 @@ typedef struct {
 typedef enum {
     RT_PEAK_UNVAL,
     RT_PEAK_S1,
-    RT_PEAL_S2
+    RT_PEAK_S2
 } RTPeakType;
 
 typedef struct {
