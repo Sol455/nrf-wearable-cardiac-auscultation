@@ -28,6 +28,5 @@ uint32_t cbb_get_absolute_sample_index(const CircularBlockBuffer *buf);
 uint32_t cbb_get_block_size(const CircularBlockBuffer *buf);
 
 //Extract window [start_abs_idx, end_abs_idx] into out_window
-int cbb_extract_window(const CircularBlockBuffer *buf, uint32_t start_idx, uint32_t end_idx, int32_t pre_samples, int32_t post_samples, float *out_window);
-
+int cbb_extract_window(const CircularBlockBuffer *buf, uint32_t start_idx, uint32_t end_idx, int32_t pre_samples, int32_t post_samples, float *out_window, int *out_window_len);
 #endif

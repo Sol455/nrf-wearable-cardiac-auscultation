@@ -14,6 +14,7 @@
 #include "ble/ble_manager.h"
 #include "audio/dsp/rt_peak_detector.h"
 #include "audio/dsp/circular_block_buffer.h"
+#include "audio/dsp/peak_processor.h"
 
 LOG_MODULE_REGISTER(main);
 
@@ -71,9 +72,16 @@ int main(void)
 		.peak_msgq = audio_stream_get_peak_msgq()
 	};
 
+	PeakProcessorConfig peak_processor_config = {
+		.pre_ratio = 0.25,
+		.pre_max_samples = 2000,
+		.pre_min_samples = 200,
+	};
+
 	AudioStreamConfig audio_stream_config = {
 		.rt_peak_config = rt_peak_config,
-		.rt_peak_val_config = rt_peak_val_config
+		.rt_peak_val_config = rt_peak_val_config,
+		.peak_processor_config = peak_processor_config,
 	};
 
     LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
@@ -88,8 +96,6 @@ int main(void)
 	if(ret!=0) LOG_ERR("BLE Failed to init");
 
 	init_audio_stream(audio_stream_config);
-
-    //event_handler_set_audio_stream(&audio_stream);
 
     //Start up the application
     AppEvent ev = { .type = EVENT_START_UP};

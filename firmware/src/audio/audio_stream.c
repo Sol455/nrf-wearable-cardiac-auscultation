@@ -22,6 +22,8 @@ AudioStreamConfig _audio_stream_config;
 CircularBlockBuffer _block_buffer;
 RTPeakDetector _rt_peak_detector;
 RTPeakValidator _rt_peak_validator;
+RTPeakValidator _rt_peak_validator;
+PeakProcessor _peak_processor;
 
 struct k_msgq *audio_stream_get_msgq() {
     return &audio_input_message_queue;
@@ -52,12 +54,18 @@ void init_filters() {
     );
 }
 
+void peak_processor_send_function(const float *window, int32_t window_start_idx, int32_t window_len) {
+    LOG_INF("Window sent: start %d, len %d, first %f", window_start_idx, window_len, window[0]);
+}
+
 void init_audio_stream(AudioStreamConfig audio_stream_config) {
     _audio_stream_config = audio_stream_config;
     init_filters();
     cbb_init(&_block_buffer, CB_NUM_BLOCKS, BLOCK_SIZE_SAMPLES);
     rt_peak_detector_init(&_rt_peak_detector, &_audio_stream_config.rt_peak_config);
     rt_peak_validator_init(&_rt_peak_validator, &_audio_stream_config.rt_peak_val_config);
+    peak_processor_init(&_peak_processor, &_audio_stream_config.peak_processor_config, peak_processor_send_function);
+
 }
 
 float32_t f32_buf[BLOCK_SIZE_SAMPLES];
@@ -133,6 +141,7 @@ void process_peaks() {
         ret = k_msgq_get(&peak_message_queue, &msg, K_FOREVER);
         if (ret == 0) {
             LOG_INF("process_peaks: Got peak type %d, global_index %d", msg.type, msg.global_index);
+            peak_processor_process_peak(&_peak_processor, &msg, &_block_buffer);
             // Process the message
         } else {
             LOG_ERR("process_peaks: k_msgq_get error %d", ret);

@@ -26,6 +26,5 @@ typedef struct {
 
 void event_handler_post(AppEvent evt);
 
-//void event_handler_set_audio_stream(AudioStream *stream);
 
 #endif
