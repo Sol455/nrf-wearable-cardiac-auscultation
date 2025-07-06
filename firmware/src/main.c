@@ -24,13 +24,6 @@ int main(void)
     int ret;
 	LOG_INF("Turning on");
 
-	ret = button_handler_init();
-	if(ret!=0) LOG_ERR("Buttons failed to init");
-    ret = led_controller_init();
-	if(ret!=0) LOG_ERR("LEDs failed to init");
-
-    LOG_INF("Configured Buttons & Interrupts");
-
 	static struct fs_file_t output_wav_file;
 
 	WavConfig output_wav_config = {
@@ -86,6 +79,9 @@ int main(void)
 		.peak_thresh_scale = 0.7,
 		.peak_min_distance = 1,
 		.de_cluster_window_r = 0.2,
+		.ident_s1_reject_r = 0.3,
+		.ident_s1_s2_gap_r = 0.29,
+		.ident_s1_s2_gap_tol = 0.15,
 	};
 
 	AudioStreamConfig audio_stream_config = {
@@ -95,11 +91,17 @@ int main(void)
 		.window_analysis_config = window_analysis_config,
 	};
 
-
     LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
 
+	ret = button_handler_init();
+	if(ret!=0) LOG_ERR("Buttons failed to init");
+    ret = led_controller_init();
+	if(ret!=0) LOG_ERR("LEDs failed to init");
+
+    LOG_INF("Configured Buttons & Interrupts");
+
 	ret = audio_in_init(audio_in_config);
-	if (ret != 0) LOG_ERR("Audio In Config Failed");
+	if(ret!=0) LOG_ERR("Audio In Config Failed");
 	
     ret = sd_card_init();
 	if(ret!=0) LOG_ERR("SD Failed to init");

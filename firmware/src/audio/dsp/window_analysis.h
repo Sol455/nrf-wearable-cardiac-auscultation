@@ -9,6 +9,7 @@ typedef enum {
     WINDOW_PEAK_TYPE_S1,
     WINDOW_PEAK_TYPE_S2,
     WINDOW_PEAK_TYPE_CANDIDATE,
+    WINDOW_PEAK_TYPE_OTHER,
 } WindowPeakType;
 
 typedef struct {
@@ -25,6 +26,9 @@ typedef struct {
     float peak_thresh_scale;
     uint32_t peak_min_distance;
     float de_cluster_window_r;
+    float ident_s1_reject_r; //reject S1 if now within this ratio of cardiac window
+    float ident_s1_s2_gap_r; //timing gap between S1 and S2
+    float ident_s1_s2_gap_tol; //timing gap tolerance
 } WindowAnalysisConfig;
 
 typedef struct {
@@ -53,6 +57,8 @@ void wa_hard_limit_ste(WindowAnalysis *window_analysis);
 void wa_find_peaks_window(WindowAnalysis *wa);
 
 void wa_remove_close_peaks(WindowAnalysis *wa);
+
+void wa_label_S1_S2_by_fraction(WindowAnalysis *wa);
 
 float calc_rms();
 

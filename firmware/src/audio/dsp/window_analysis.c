@@ -1,6 +1,8 @@
-#include "window_analysis.h"
 #include <zephyr/logging/log.h>
 #include "arm_math.h"
+#include <stdlib.h>
+
+#include "window_analysis.h"
 
 LOG_MODULE_REGISTER(window_analysis);
 
@@ -127,6 +129,88 @@ void wa_remove_close_peaks(WindowAnalysis *wa)
         i = cluster_end + 1;
     }
 }
+
+void wa_label_S1_S2_by_fraction(WindowAnalysis *wa)
+{
+    if (!wa) return;
+    float reject_s1_ratio = wa->cfg.ident_s1_reject_r;      
+    float ratio           = wa->cfg.ident_s1_s2_gap_r;     
+    float tolerance       = wa->cfg.ident_s1_s2_gap_tol;   
+    int32_t window_len    = wa->ste_window_len;
+
+    int candidate_indices[MAX_NUM_WINDOW_PEAKS];
+    int n_candidates = 0;
+    for (int i = 0; i < wa->num_peaks; ++i) {
+        if (wa->peaks[i].type == WINDOW_PEAK_TYPE_CANDIDATE) {
+            candidate_indices[n_candidates++] = i;
+        }
+    }
+
+    // If less than 2 candidates, mark as other and return
+    if (n_candidates < 2) {
+        for (int j = 0; j < n_candidates; ++j) {
+            wa->peaks[candidate_indices[j]].type = WINDOW_PEAK_TYPE_OTHER;
+        }
+        return;
+    }
+
+    float target_gap   = ratio * window_len;
+    float allowed_min  = (ratio - tolerance) * window_len;
+    float allowed_max  = (ratio + tolerance) * window_len;
+    float reject_window = reject_s1_ratio * window_len;
+
+    int best_s1_idx = -1;
+    int best_s2_idx = -1;
+    float min_dist = FLT_MAX;
+
+    for (int m = 0; m < n_candidates; ++m) {
+        for (int n2 = m + 1; n2 < n_candidates; ++n2) {
+            int idx1 = wa->peaks[candidate_indices[m]].ste_index;
+            int idx2 = wa->peaks[candidate_indices[n2]].ste_index;
+
+            int s1_idx, s2_idx;
+            if (idx1 < idx2) {
+                s1_idx = candidate_indices[m];
+                s2_idx = candidate_indices[n2];
+            } else {
+                s1_idx = candidate_indices[n2];
+                s2_idx = candidate_indices[m];
+            }
+
+            if (wa->peaks[s1_idx].ste_index > reject_window) continue;
+
+            int gap = abs(idx2 - idx1);
+            if (gap >= allowed_min && gap <= allowed_max) {
+                float dist = fabsf((float)gap - target_gap);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    best_s1_idx = s1_idx;
+                    best_s2_idx = s2_idx;
+                }
+            }
+        }
+    }
+
+    //Assign S1/S2
+    if (best_s1_idx != -1 && best_s2_idx != -1) {
+        for (int i = 0; i < n_candidates; ++i) {
+            int pidx = candidate_indices[i];
+            if (pidx == best_s1_idx) {
+                wa->peaks[pidx].type = WINDOW_PEAK_TYPE_S1;
+            } else if (pidx == best_s2_idx) {
+                wa->peaks[pidx].type = WINDOW_PEAK_TYPE_S2;
+            } else {
+                wa->peaks[pidx].type = WINDOW_PEAK_TYPE_OTHER;
+            }
+        }
+    } else {
+        // If no pair, tag all candidates as other
+        for (int j = 0; j < n_candidates; ++j) {
+            wa->peaks[candidate_indices[j]].type = WINDOW_PEAK_TYPE_OTHER;
+        }
+    }
+}
+
 
 
 float calc_rms(const float *window, int32_t len)

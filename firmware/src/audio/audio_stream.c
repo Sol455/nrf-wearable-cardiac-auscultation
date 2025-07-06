@@ -76,7 +76,12 @@ void peak_processor_send_function(const float *window, int32_t window_start_idx,
     //6.0 Remove peak clusters, find biggest peak in each
     wa_remove_close_peaks(&_window_analyser);
     
-    //window_analysis_hard_limit
+    //7.0 Identify S1 and S2 peaks via timings and ratio of cardiac period
+    wa_label_S1_S2_by_fraction(&_window_analyser);
+    
+    //8. perform FFT on window and calc RMS
+
+    //9. Create heart beat event and publish
 
     LOG_INF("Window sent: start %d, len %d, first %f, mean: %f, ste_mean: %f, ste num_peaks: %d", window_start_idx, window_len, window[0], window_mean, _window_analyser.ste_mean, _window_analyser.num_peaks);
 
