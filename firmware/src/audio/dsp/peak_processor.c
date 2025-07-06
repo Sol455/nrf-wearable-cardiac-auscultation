@@ -36,7 +36,7 @@ void peak_processor_process_peak(PeakProcessor *proc, const RTPeakMessage *peak_
                 int32_t window_start_index = s1_idx_prev - pre_samples;
                 int32_t window_len = s1_idx_curr - window_start_index;
 
-                if (window_len > 0 && window_len <= MAX_WINDOW_LEN) {
+                if (window_len > 0 && window_len <= PP_MAX_WINDOW_LEN) {
                     int ret = cbb_extract_window(
                         slab_buffer, s1_idx_prev, s1_idx_curr,
                         pre_samples, -pre_samples,
@@ -49,7 +49,7 @@ void peak_processor_process_peak(PeakProcessor *proc, const RTPeakMessage *peak_
                         LOG_ERR("Window extraction failed or window too long");
                     }
                 } else {
-                    LOG_ERR("Invalid window_len: %d (MAX %d)", window_len, MAX_WINDOW_LEN);
+                    LOG_ERR("Invalid window_len: %d (MAX %d)", window_len, PP_MAX_WINDOW_LEN);
                 }
             }
         }

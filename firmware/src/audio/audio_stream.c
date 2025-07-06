@@ -24,6 +24,7 @@ RTPeakDetector _rt_peak_detector;
 RTPeakValidator _rt_peak_validator;
 RTPeakValidator _rt_peak_validator;
 PeakProcessor _peak_processor;
+WindowAnalysis _window_analyser;
 
 struct k_msgq *audio_stream_get_msgq() {
     return &audio_input_message_queue;
@@ -53,9 +54,26 @@ void init_filters() {
         lp_state
     );
 }
-
 void peak_processor_send_function(const float *window, int32_t window_start_idx, int32_t window_len) {
-    LOG_INF("Window sent: start %d, len %d, first %f", window_start_idx, window_len, window[0]);
+
+    wa_set_audio_window(&_window_analyser, window, window_len);
+
+    //1.0 get window timestamp
+    int32_t window_time_ms = (int32_t)(((float)window_start_idx / (float)MAX_SAMPLE_RATE) * 1000.0f);
+
+    float window_mean = compute_mean_abs(window, window_len);
+    //2.0 Hard limit audio
+    //hard_limit(window, window_len, window_mean, _audio_stream_config.window_analysis_config.audio_hl_thresh, limited_window_buf);
+
+    //3.0 Calculate STE
+    wa_calc_ste_blocks(&_window_analyser);
+    wa_hard_limit_ste(&_window_analyser);
+
+    //4.0 Hard Limit STE
+    //window_analysis_hard_limit
+
+    LOG_INF("Window sent: start %d, len %d, first %f, mean: %f", window_start_idx, window_len, window[0], window_mean);
+
 }
 
 void init_audio_stream(AudioStreamConfig audio_stream_config) {
@@ -65,6 +83,7 @@ void init_audio_stream(AudioStreamConfig audio_stream_config) {
     rt_peak_detector_init(&_rt_peak_detector, &_audio_stream_config.rt_peak_config);
     rt_peak_validator_init(&_rt_peak_validator, &_audio_stream_config.rt_peak_val_config);
     peak_processor_init(&_peak_processor, &_audio_stream_config.peak_processor_config, peak_processor_send_function);
+    wa_init(&_window_analyser,  &_audio_stream_config.window_analysis_config);
 
 }
 

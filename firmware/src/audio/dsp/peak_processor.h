@@ -6,8 +6,7 @@
 #include <zephyr/kernel.h>
 #include <stdint.h>
 #include <stdbool.h>
-
-#define MAX_WINDOW_LEN 32000
+#include "../../macros.h"
 
 typedef void (*PeakProcessFn)(const float *window, int32_t window_start_idx, int32_t window_len);
 
@@ -20,7 +19,7 @@ typedef struct {
 typedef struct {
     RTPeakMessage previous_s1_event;
     bool has_previous_s1;
-    float window[MAX_WINDOW_LEN];
+    float window[PP_MAX_WINDOW_LEN];
     int32_t window_len;
     PeakProcessFn process_fn;
     PeakProcessorConfig config;

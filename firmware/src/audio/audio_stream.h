@@ -10,12 +10,14 @@
 #include "dsp/rt_peak_detector.h"
 #include "dsp/peak_validator.h"
 #include "dsp/peak_processor.h"
+#include "dsp/window_analysis.h"
 
 typedef struct {
     struct k_mem_slab *mem_slab; 
     RTPeakConfig rt_peak_config;
     RTPeakValConfig rt_peak_val_config;
     PeakProcessorConfig peak_processor_config;
+    WindowAnalysisConfig window_analysis_config
 } AudioStreamConfig;
 
 void init_audio_stream(AudioStreamConfig audio_stream_config);

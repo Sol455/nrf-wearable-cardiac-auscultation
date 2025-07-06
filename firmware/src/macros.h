@@ -21,8 +21,16 @@
 
 #define MAX_FILENAME_LEN 16
 
+//DSP 
 //Circular Buffer
 #define CB_NUM_BLOCKS 20
 #define CB_BLOCK_SAMPLES BLOCK_SIZE_SAMPLES
+
+//Peak Processor
+#define PP_MAX_WINDOW_LEN CB_NUM_BLOCKS * CB_BLOCK_SAMPLES
+
+//Window Analysis
+#define STE_SAMPLES_PER_BLOCK 160 // 160 at 16khz = 10ms
+#define STE_MAX_BUF_LEN PP_MAX_WINDOW_LEN / STE_SAMPLES_PER_BLOCK
 
 #endif

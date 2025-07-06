@@ -15,6 +15,7 @@
 #include "audio/dsp/rt_peak_detector.h"
 #include "audio/dsp/circular_block_buffer.h"
 #include "audio/dsp/peak_processor.h"
+#include "audio/dsp/window_analysis.h"
 
 LOG_MODULE_REGISTER(main);
 
@@ -78,11 +79,19 @@ int main(void)
 		.pre_min_samples = 200,
 	};
 
+	WindowAnalysisConfig window_analysis_config = {
+		.audio_hl_thresh = 1.0f / 3.0f,
+		.ste_block_size_samples = STE_SAMPLES_PER_BLOCK,
+		.ste_hl_thresh = 0.4,
+	};
+
 	AudioStreamConfig audio_stream_config = {
 		.rt_peak_config = rt_peak_config,
 		.rt_peak_val_config = rt_peak_val_config,
 		.peak_processor_config = peak_processor_config,
+		.window_analysis_config = window_analysis_config,
 	};
+
 
     LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
 
