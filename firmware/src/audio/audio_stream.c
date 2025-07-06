@@ -73,6 +73,8 @@ void peak_processor_send_function(const float *window, int32_t window_start_idx,
 
     //5.0 Find candidate STE peaks
     wa_find_peaks_window(&_window_analyser);
+    //6.0 Remove peak clusters, find biggest peak in each
+    wa_remove_close_peaks(&_window_analyser);
     
     //window_analysis_hard_limit
 

@@ -8,7 +8,7 @@ typedef enum {
     WINDOW_PEAK_TYPE_UNVAL,
     WINDOW_PEAK_TYPE_S1,
     WINDOW_PEAK_TYPE_S2,
-    WINDOW_PEAK_TYPE_OTHER,
+    WINDOW_PEAK_TYPE_CANDIDATE,
 } WindowPeakType;
 
 typedef struct {
@@ -24,6 +24,7 @@ typedef struct {
     float ste_hl_thresh;
     float peak_thresh_scale;
     uint32_t peak_min_distance;
+    float de_cluster_window_r;
 } WindowAnalysisConfig;
 
 typedef struct {
@@ -51,7 +52,7 @@ void wa_hard_limit_ste(WindowAnalysis *window_analysis);
 
 void wa_find_peaks_window(WindowAnalysis *wa);
 
-int32_t remove_close_peaks();
+void wa_remove_close_peaks(WindowAnalysis *wa);
 
 float calc_rms();
 

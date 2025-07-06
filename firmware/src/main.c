@@ -85,6 +85,7 @@ int main(void)
 		.ste_hl_thresh = 0.4,
 		.peak_thresh_scale = 0.7,
 		.peak_min_distance = 1,
+		.de_cluster_window_r = 0.2,
 	};
 
 	AudioStreamConfig audio_stream_config = {

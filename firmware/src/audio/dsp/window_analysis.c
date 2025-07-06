@@ -100,10 +100,34 @@ void wa_find_peaks_window(WindowAnalysis *wa) {
     wa->num_peaks = n_found; 
 }
 
-int32_t remove_close_peaks()
+void wa_remove_close_peaks(WindowAnalysis *wa)
 {
-    return 0;
+    if (!wa || wa->num_peaks <= 0) return;
+
+    int32_t min_gap_samples = (int32_t)(wa->cfg.de_cluster_window_r * wa->ste_window_len);
+    int32_t n = wa->num_peaks;
+
+    int32_t i = 0;
+    while (i < n) {
+        int32_t cluster_start = i;
+        int32_t cluster_end = i;
+        //Find cluster end
+        while (cluster_end + 1 < n &&
+               (wa->peaks[cluster_end + 1].ste_index - wa->peaks[cluster_start].ste_index) < min_gap_samples)
+        {
+            cluster_end++;
+        }
+        //Find tallest in cluster
+        int32_t max_idx = cluster_start;
+        for (int32_t j = cluster_start + 1; j <= cluster_end; ++j) {
+            if (wa->peaks[j].value > wa->peaks[max_idx].value)
+                max_idx = j;
+        }
+        wa->peaks[max_idx].type = WINDOW_PEAK_TYPE_CANDIDATE;
+        i = cluster_end + 1;
+    }
 }
+
 
 float calc_rms(const float *window, int32_t len)
 {
