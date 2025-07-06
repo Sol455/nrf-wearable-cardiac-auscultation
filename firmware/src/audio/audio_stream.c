@@ -65,14 +65,18 @@ void peak_processor_send_function(const float *window, int32_t window_start_idx,
     //2.0 Hard limit audio
     //hard_limit(window, window_len, window_mean, _audio_stream_config.window_analysis_config.audio_hl_thresh, limited_window_buf);
 
-    //3.0 Calculate STE
+    //3.0 Calculte STE Profile
     wa_calc_ste_blocks(&_window_analyser);
+    //4.0 Calculte STE mean & Hard Limit
+    wa_calc_ste_mean(&_window_analyser);
     wa_hard_limit_ste(&_window_analyser);
 
-    //4.0 Hard Limit STE
+    //5.0 Find candidate STE peaks
+    wa_find_peaks_window(&_window_analyser);
+    
     //window_analysis_hard_limit
 
-    LOG_INF("Window sent: start %d, len %d, first %f, mean: %f", window_start_idx, window_len, window[0], window_mean);
+    LOG_INF("Window sent: start %d, len %d, first %f, mean: %f, ste_mean: %f, ste num_peaks: %d", window_start_idx, window_len, window[0], window_mean, _window_analyser.ste_mean, _window_analyser.num_peaks);
 
 }
 

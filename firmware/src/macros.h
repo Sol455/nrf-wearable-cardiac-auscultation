@@ -32,5 +32,6 @@
 //Window Analysis
 #define STE_SAMPLES_PER_BLOCK 160 // 160 at 16khz = 10ms
 #define STE_MAX_BUF_LEN PP_MAX_WINDOW_LEN / STE_SAMPLES_PER_BLOCK
+#define MAX_NUM_WINDOW_PEAKS 64
 
 #endif

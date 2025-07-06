@@ -83,6 +83,8 @@ int main(void)
 		.audio_hl_thresh = 1.0f / 3.0f,
 		.ste_block_size_samples = STE_SAMPLES_PER_BLOCK,
 		.ste_hl_thresh = 0.4,
+		.peak_thresh_scale = 0.7,
+		.peak_min_distance = 1,
 	};
 
 	AudioStreamConfig audio_stream_config = {

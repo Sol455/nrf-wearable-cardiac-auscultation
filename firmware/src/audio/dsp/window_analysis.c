@@ -13,6 +13,8 @@ void wa_init(WindowAnalysis *window_analysis, const WindowAnalysisConfig *window
     window_analysis->audio_window = NULL;
     window_analysis->audio_window_len = 0;
     window_analysis->ste_window_len = 0;
+    window_analysis->ste_mean = 0.0;
+    window_analysis->num_peaks = 0;
     //Memset STE buffer
     memset(window_analysis->ste_buffer, 0, sizeof(window_analysis->ste_buffer));
    
@@ -60,18 +62,42 @@ void wa_calc_ste_blocks(WindowAnalysis *window_analysis)
     }
 }
 
-void wa_hard_limit_ste(WindowAnalysis *window_analysis)
-{
+void wa_calc_ste_mean(WindowAnalysis *window_analysis) {
     if (!window_analysis || window_analysis->ste_window_len <= 0) return;
-    float mean;
-    arm_mean_f32(window_analysis->ste_buffer, window_analysis->ste_window_len, &mean);
-    _hard_limit(window_analysis->ste_buffer, window_analysis->ste_window_len, mean, window_analysis->cfg.ste_hl_thresh, window_analysis->ste_buffer);
+    arm_mean_f32(window_analysis->ste_buffer, window_analysis->ste_window_len, &window_analysis->ste_mean);
 }
 
-int32_t find_peaks_window()
+void wa_hard_limit_ste(WindowAnalysis *window_analysis)
 {
-    return 0;
+    if (!window_analysis || window_analysis->ste_window_len <= 0 || window_analysis->ste_mean == 0.0) return;
 
+    _hard_limit(window_analysis->ste_buffer, window_analysis->ste_window_len, window_analysis->ste_mean, window_analysis->cfg.ste_hl_thresh, window_analysis->ste_buffer);
+}
+
+void wa_find_peaks_window(WindowAnalysis *wa) {
+    if (!wa || wa->ste_window_len <= 2) return;
+
+    float threshold = wa->ste_mean * wa->cfg.peak_thresh_scale;
+    int32_t last_peak = -wa->cfg.peak_min_distance - 1; // Ensures that first peak can be at 0
+    int32_t n_found = 0;
+
+    for (int32_t i = 1; i < wa->ste_window_len - 1; ++i) {
+        if (
+            wa->ste_buffer[i] > threshold &&
+            wa->ste_buffer[i] > wa->ste_buffer[i - 1] &&
+            wa->ste_buffer[i] > wa->ste_buffer[i + 1] &&
+            (i - last_peak) >= wa->cfg.peak_min_distance
+        ) {
+            if (n_found < MAX_NUM_WINDOW_PEAKS) {
+                wa->peaks[n_found].ste_index = i;
+                wa->peaks[n_found].value = wa->ste_buffer[i];
+                wa->peaks[n_found].type = WINDOW_PEAK_TYPE_UNVAL;
+                n_found++;
+            }
+            last_peak = i;
+        }
+    }
+    wa->num_peaks = n_found; 
 }
 
 int32_t remove_close_peaks()
