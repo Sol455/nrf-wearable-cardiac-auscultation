@@ -12,7 +12,6 @@ void _generate_hann_window(float *buf, uint32_t N) {
     }
 }
 
-
 void wa_init(WindowAnalysis *window_analysis, const WindowAnalysisConfig *window_analysis_config)
 {
     if (!window_analysis || !window_analysis_config) return;
@@ -314,6 +313,10 @@ void wa_extract_peak_features(WindowAnalysis *wa)
 
             int32_t sub_len = end - start;
             const float *sub_window = &wa->audio_window[start];
+            if (sub_len != wa->cfg.hs_window_size) {
+                LOG_ERR("Sub window sizes don't match");
+                break;
+            }
 
             // Calculate RMS
             wa->peaks[i].rms = _calc_rms(sub_window, (uint32_t)sub_len);
@@ -322,7 +325,7 @@ void wa_extract_peak_features(WindowAnalysis *wa)
             wa->peaks[i].centroid = _calc_spectral_centroid(
                 sub_window,
                 wa->hann_window,
-                (int)wa->cfg.hs_window_size,
+                wa->cfg.hs_window_size,
                 MAX_SAMPLE_RATE,
                 &wa->fft_instance,
                 wa->scratch_windowed,
