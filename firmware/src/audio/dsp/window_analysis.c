@@ -1,6 +1,7 @@
 #include <zephyr/logging/log.h>
 #include <stdlib.h>
 #include "window_analysis.h"
+#include "../../ble/heart_service.h"
 
 LOG_MODULE_REGISTER(window_analysis);
 
@@ -33,9 +34,10 @@ void wa_init(WindowAnalysis *window_analysis, const WindowAnalysisConfig *window
     memset(window_analysis->peaks, 0, sizeof(window_analysis->peaks));
 }
 
-void wa_set_audio_window(WindowAnalysis *window_analysis, const float *audio_window, int32_t window_len)
+void wa_set_audio_window(WindowAnalysis *window_analysis, const float *audio_window, int32_t window_len, uint32_t window_start_idx)
 {
     if (!window_analysis) return;
+    window_analysis->window_start_idx = window_start_idx;
     window_analysis->audio_window = audio_window;
     window_analysis->audio_window_len = window_len;
 }
@@ -315,7 +317,7 @@ void wa_extract_peak_features(WindowAnalysis *wa)
             const float *sub_window = &wa->audio_window[start];
             if (sub_len != wa->cfg.hs_window_size) {
                 LOG_ERR("Sub window sizes don't match");
-                break;
+                continue;
             }
 
             // Calculate RMS
@@ -338,4 +340,17 @@ void wa_extract_peak_features(WindowAnalysis *wa)
     }
 }
 
+void wa_make_send_ble(WindowAnalysis *wa) {
+    struct heart_packet packet;  
+    for (int32_t i = 0; i < wa->num_peaks; i++) {
+        if (wa->peaks[i].type == WINDOW_PEAK_TYPE_S1) {
+            packet.centroid = wa->peaks[i].centroid;
+            packet.rms = wa->peaks[i].rms;
+            uint32_t absolute_sample_index = wa->window_start_idx + wa->peaks[i].audio_index;
+            uint32_t timestamp_ms = (uint32_t)(((float)absolute_sample_index / (float)MAX_SAMPLE_RATE) * 1000.0f);
+            packet.timestamp_ms = timestamp_ms;
+            bt_heart_service_notify_packet(&packet);
+        }
+    }
+}
 

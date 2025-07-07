@@ -38,6 +38,7 @@ typedef struct {
 typedef struct {
     const float *audio_window;
     WindowAnalysisConfig cfg;
+    uint32_t window_start_idx;
     int32_t audio_window_len;
     float ste_buffer[STE_MAX_BUF_LEN];
     int32_t ste_window_len;
@@ -53,7 +54,7 @@ typedef struct {
 
 void wa_init(WindowAnalysis *window_analysis, const WindowAnalysisConfig *window_analysis_config);
 
-void wa_set_audio_window(WindowAnalysis *window_analysis, const float *audio_window, int32_t window_len);
+void wa_set_audio_window(WindowAnalysis *window_analysis, const float *audio_window, int32_t window_len, uint32_t window_start_idx);
 
 float compute_mean_abs(const float *window, int32_t len);
 
@@ -72,5 +73,7 @@ void wa_label_S1_S2_by_fraction(WindowAnalysis *wa);
 void wa_assign_audio_peaks(WindowAnalysis *wa);
 
 void wa_extract_peak_features(WindowAnalysis *wa);
+
+void wa_make_send_ble(WindowAnalysis *wa);
 
 #endif 

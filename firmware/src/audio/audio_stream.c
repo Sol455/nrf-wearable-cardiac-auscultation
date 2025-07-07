@@ -56,7 +56,7 @@ void init_filters() {
 }
 void peak_processor_send_function(const float *window, int32_t window_start_idx, int32_t window_len) {
 
-    wa_set_audio_window(&_window_analyser, window, window_len);
+    wa_set_audio_window(&_window_analyser, window, window_len, window_start_idx);
 
     //1.0 get window timestamp
     int32_t window_time_ms = (int32_t)(((float)window_start_idx / (float)MAX_SAMPLE_RATE) * 1000.0f);
@@ -85,6 +85,7 @@ void peak_processor_send_function(const float *window, int32_t window_start_idx,
     wa_extract_peak_features(&_window_analyser);
 
     //9. Create heart beat event and publish
+    wa_make_send_ble(&_window_analyser);
 
     LOG_INF("Window sent: start %d, len %d, first %f, mean: %f, ste_mean: %f, ste num_peaks: %d", window_start_idx, window_len, window[0], window_mean, _window_analyser.ste_mean, _window_analyser.num_peaks);
 
