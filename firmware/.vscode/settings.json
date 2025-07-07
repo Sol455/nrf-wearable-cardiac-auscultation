@@ -33,7 +33,16 @@
         "functional": "c",
         "tuple": "c",
         "type_traits": "c",
-        "utility": "c"
+        "utility": "c",
+        "rt_peak_detector.h": "c",
+        "stdint.h": "c",
+        "peak_validator.h": "c",
+        "lowpass_coeffs.h": "c",
+        "peak_processor.h": "c",
+        "arm_math.h": "c",
+        "window_analysis.h": "c",
+        "random": "c",
+        "float.h": "c"
     },
     "nrf-connect.applications": [
         "${workspaceFolder}"

@@ -3,6 +3,7 @@
 
 #include <zephyr/kernel.h>
 #include "../../macros.h"
+#include "arm_math.h"
 
 typedef enum {
     WINDOW_PEAK_TYPE_UNVAL,
@@ -16,7 +17,9 @@ typedef struct {
     int32_t ste_index;     
     float value;          
     WindowPeakType type;
-    int32_t audio_index;           
+    int32_t audio_index;   
+    float rms;
+    float centroid;        
 } WindowPeak;
 
 typedef struct {
@@ -29,6 +32,7 @@ typedef struct {
     float ident_s1_reject_r; //reject S1 if now within this ratio of cardiac window
     float ident_s1_s2_gap_r; //timing gap between S1 and S2
     float ident_s1_s2_gap_tol; //timing gap tolerance
+    uint32_t hs_window_size;
 } WindowAnalysisConfig;
 
 typedef struct {
@@ -40,6 +44,11 @@ typedef struct {
     float ste_mean;
     WindowPeak peaks[MAX_NUM_WINDOW_PEAKS];
     int32_t num_peaks;
+    float hann_window[HS_WINDOW_SIZE];
+    arm_rfft_fast_instance_f32 fft_instance;
+    float scratch_windowed[HS_WINDOW_SIZE];
+    float scratch_fft_out[HS_WINDOW_SIZE + 2];
+    float scratch_fft_mag[(HS_WINDOW_SIZE / 2) - 1];
 } WindowAnalysis;
 
 void wa_init(WindowAnalysis *window_analysis, const WindowAnalysisConfig *window_analysis_config);
@@ -60,8 +69,8 @@ void wa_remove_close_peaks(WindowAnalysis *wa);
 
 void wa_label_S1_S2_by_fraction(WindowAnalysis *wa);
 
-float calc_rms();
+void wa_assign_audio_peaks(WindowAnalysis *wa);
 
-float calc_centroid();
+void wa_extract_peak_features(WindowAnalysis *wa);
 
 #endif 

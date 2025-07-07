@@ -82,6 +82,7 @@ int main(void)
 		.ident_s1_reject_r = 0.3,
 		.ident_s1_s2_gap_r = 0.29,
 		.ident_s1_s2_gap_tol = 0.15,
+		.hs_window_size = HS_WINDOW_SIZE,
 	};
 
 	AudioStreamConfig audio_stream_config = {

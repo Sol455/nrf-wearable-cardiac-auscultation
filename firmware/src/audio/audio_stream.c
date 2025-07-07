@@ -79,7 +79,10 @@ void peak_processor_send_function(const float *window, int32_t window_start_idx,
     //7.0 Identify S1 and S2 peaks via timings and ratio of cardiac period
     wa_label_S1_S2_by_fraction(&_window_analyser);
     
+    //8.0 Identify peaks in audio window from STE peaks
+    wa_assign_audio_peaks(&_window_analyser);
     //8. perform FFT on window and calc RMS
+    wa_extract_peak_features(&_window_analyser);
 
     //9. Create heart beat event and publish
 
