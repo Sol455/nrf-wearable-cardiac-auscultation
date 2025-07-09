@@ -43,7 +43,7 @@ int main(void)
 	};
 
 	AudioInConfig audio_in_config = {
-		.audio_input_type = AUDIO_INPUT_TYPE_WAV,
+		.audio_input_type = AUDIO_INPUT_TYPE_PDM,
 		.input_wav_config = input_wav_config,
 		.output_wav_config = output_wav_config,
 		.dmic_ctx = DEVICE_DT_GET(DT_NODELABEL(pdm0)),

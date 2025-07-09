@@ -119,6 +119,8 @@ void _process_block(audio_slab_msg *msg) {
     arm_q15_to_float((int16_t *)msg->buffer, f32_buf, BLOCK_SIZE_SAMPLES); //Convert to F32
     arm_biquad_cascade_df1_f32(&bp_inst, f32_buf, block_to_write, BLOCK_SIZE_SAMPLES); // Filter into slab buffer
     cbb_advance_write_index(&_block_buffer); //Advance slab buffer index for next run
+    k_mem_slab_free(audio_in_get_mem_slab(), msg->buffer);
+
 
     // arm_float_to_q15(f32_buf, out_q15, BLOCK_SIZE_SAMPLES); // Convert back to int for saving to file
     // ret = write_wav_data(msg->audio_output_file, (const char *)out_q15, msg->size); // write to wav file
@@ -142,7 +144,6 @@ void _process_block(audio_slab_msg *msg) {
     }
 
 
-    //k_mem_slab_free(audio_in_get_mem_slab(), msg->buffer);
     if (ret != 0) {
         LOG_ERR("Failed to write to file, rc=%d", ret);
         return;
