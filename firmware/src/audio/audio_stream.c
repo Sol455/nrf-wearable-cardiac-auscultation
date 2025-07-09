@@ -65,13 +65,9 @@ void peak_processor_send_function(const float *window, int32_t window_start_idx,
 
     wa_set_audio_window(&_window_analyser, window, window_len, window_start_idx);
 
-    //1.0 get window timestamp
-    int32_t window_time_ms = (int32_t)(((float)window_start_idx / (float)MAX_SAMPLE_RATE) * 1000.0f);
-
     float window_mean = compute_mean_abs(window, window_len);
     //2.0 Hard limit audio
     //hard_limit(window, window_len, window_mean, _audio_stream_config.window_analysis_config.audio_hl_thresh, limited_window_buf);
-
     //3.0 Calculte STE Profile
     wa_calc_ste_blocks(&_window_analyser);
     //4.0 Calculte STE mean & Hard Limit

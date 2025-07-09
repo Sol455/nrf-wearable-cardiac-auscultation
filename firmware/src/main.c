@@ -3,7 +3,9 @@
 #include <zephyr/logging/log.h>
 #include "modules/button_handler.h"
 #include "modules/led_controller.h"
+#ifdef CONFIG_SD_CARD_SUPPORT
 #include "modules/sd_card.h"
+#endif
 #include "audio/wav_file.h"
 #include "audio/audio_in.h"
 #include "audio/audio_stream.h"
@@ -92,8 +94,6 @@ int main(void)
 		.window_analysis_config = window_analysis_config,
 	};
 
-    LOG_INF("BLOCK SIZE: %d\n", MAX_BLOCK_SIZE);
-
 	ret = button_handler_init();
 	if(ret!=0) LOG_ERR("Buttons failed to init");
     ret = led_controller_init();
@@ -104,15 +104,17 @@ int main(void)
 	ret = audio_in_init(audio_in_config);
 	if(ret!=0) LOG_ERR("Audio In Config Failed");
 	
-    // ret = sd_card_init();
-	// if(ret!=0) LOG_ERR("SD Failed to init");
+    #if IS_ENABLED(CONFIG_SD_CARD_SUPPORT) 
+    ret = sd_card_init();
+	if(ret!=0) LOG_ERR("SD Failed to init");
+	#endif
 
 	ret = ble_init();
 	if(ret!=0) LOG_ERR("BLE Failed to init");
 
 	init_audio_stream(audio_stream_config);
 
-    // //Start up the application
+    // Start up the application
     AppEvent ev = { .type = EVENT_START_UP};
     event_handler_post(ev);
 	

@@ -1,7 +1,9 @@
 #include "audio_in.h"
 #include <zephyr/logging/log.h>
 #include <stdio.h>
+#ifdef CONFIG_SD_CARD_SUPPORT
 #include "../modules/sd_card.h"
+#endif
 
 #define PDM_MEM_SLAB_BLOCK_COUNT 8
 
@@ -137,16 +139,17 @@ void generate_wav_filename() {
 int audio_in_init(AudioInConfig audio_in_config) {
     _audio_in_config = audio_in_config;
     switch (_audio_in_config.audio_input_type) {
-        
         case AUDIO_INPUT_TYPE_PDM:
             return pdm_init();
+        #if IS_ENABLED(CONFIG_SD_CARD_SUPPORT) 
         case AUDIO_INPUT_TYPE_PDM_TO_WAV:
             pdm_init();
             return -1;
         case AUDIO_INPUT_TYPE_WAV:
             return 0;
+        #endif
         default:
-            LOG_ERR("Unknown audio input type!");
+            LOG_ERR("Unknown or incompatible audio input type!");
             return -1;
     }
     LOG_INF("Init audio input");
@@ -156,20 +159,22 @@ int audio_in_init(AudioInConfig audio_in_config) {
 int audio_in_start() {
     int ret;
     switch (_audio_in_config.audio_input_type) {
-        case AUDIO_INPUT_TYPE_PDM :
+        case AUDIO_INPUT_TYPE_PDM:
             ret = pdm_capture_audio();
-            break;
+            return ret;
+        #if IS_ENABLED(CONFIG_SD_CARD_SUPPORT) 
         case AUDIO_INPUT_TYPE_PDM_TO_WAV:
             generate_wav_filename();
             open_wav_for_write(&_audio_in_config.output_wav_config);
             ret = pdm_capture_audio();
-            break;
+            return ret;
         case AUDIO_INPUT_TYPE_WAV:
             ret = open_wav_for_read(&_audio_in_config.input_wav_config);
             wav_file_capture_audio();
-            break;
+            return ret;
+        #endif
         default:
-            LOG_ERR("Unknown audio input type!");
+            LOG_ERR("Unknown or incompatible audio input type!");
             return -1;
     }
     return ret;
@@ -181,6 +186,7 @@ int audio_in_stop() {
         case AUDIO_INPUT_TYPE_PDM:
             ret = pdm_stop();
             return ret;
+        #if IS_ENABLED(CONFIG_SD_CARD_SUPPORT) 
         case AUDIO_INPUT_TYPE_PDM_TO_WAV:
             ret = pdm_stop();
             ret = sd_card_close(_audio_in_config.output_wav_config.wav_file);
@@ -194,6 +200,7 @@ int audio_in_stop() {
                 LOG_ERR("SD failed to close: %d", ret);
             }
             return ret;
+        #endif
         default:
             LOG_ERR("Unknown audio input type!");
             return -1;
