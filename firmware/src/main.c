@@ -104,8 +104,8 @@ int main(void)
 	ret = audio_in_init(audio_in_config);
 	if(ret!=0) LOG_ERR("Audio In Config Failed");
 	
-    ret = sd_card_init();
-	if(ret!=0) LOG_ERR("SD Failed to init");
+    // ret = sd_card_init();
+	// if(ret!=0) LOG_ERR("SD Failed to init");
 
 	ret = ble_init();
 	if(ret!=0) LOG_ERR("BLE Failed to init");

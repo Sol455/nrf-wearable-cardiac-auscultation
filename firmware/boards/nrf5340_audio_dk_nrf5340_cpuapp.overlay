@@ -2,15 +2,15 @@
     aliases {
         led0 = &board_led0;
         sw0  = &board_button0;
-        sw1  = &board_button1; 
-        spi-sd = &spi2;
+        //sw1  = &board_button1; 
+        //spi-sd = &spi2;
     };
 
     leds {
         compatible = "gpio-leds";
 
         board_led0: led_0 {
-            gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+            gpios = <&gpio1 06 GPIO_ACTIVE_HIGH>;
             label = "LED0";
         };
     };
@@ -19,49 +19,48 @@
         compatible = "gpio-keys";
 
         board_button0: button_0 {
-            gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+            gpios = <&gpio0 24 GPIO_ACTIVE_HIGH>;
             label = "Button 0";
         };
 
-        board_button1: button_1 {
-            gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
-            label = "Button 1";
-        };
+        // board_button1: button_1 {
+        //     gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+        //     label = "Button 1";
+        // };
     };
 };
 
-&spi2 {
-    compatible = "nordic,nrf-spim";
-    status = "okay";
-    pinctrl-0 = <&spi2_sd_pins>;
-    pinctrl-names = "default";
-    cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;  // CS index 0
+// &spi2 {
+//     compatible = "nordic,nrf-spim";
+//     status = "okay";
+//     pinctrl-0 = <&spi2_sd_pins>;
+//     pinctrl-names = "default";
+//     cs-gpios = <&gpio0 15 GPIO_ACTIVE_LOW>;  // CS index 0
 
-    board_sdhc0: sdhc@0 {
-        compatible = "zephyr,sdhc-spi-slot";
-        reg = <0>;
-        status = "okay";
+//     board_sdhc0: sdhc@0 {
+//         compatible = "zephyr,sdhc-spi-slot";
+//         reg = <0>;
+//         status = "okay";
 
-        sdmmc {
-            compatible = "zephyr,sdmmc-disk";
-            status = "okay";
-            label = "SD";  
-        };
+//         sdmmc {
+//             compatible = "zephyr,sdmmc-disk";
+//             status = "okay";
+//             label = "SD";  
+//         };
 
-        spi-max-frequency = <1000000>;
-    };
-};
+//         spi-max-frequency = <1000000>;
+//     };
+// };
 
-&pinctrl {
-    spi2_sd_pins: spi2_sd_pins {
-        group1 {
-            psels = <NRF_PSEL(SPIM_SCK, 0, 8)>,
-                    <NRF_PSEL(SPIM_MOSI, 0, 9)>,
-                    <NRF_PSEL(SPIM_MISO, 0, 10)>;
-        };
-    };
-};
-
+// &pinctrl {
+//     spi2_sd_pins: spi2_sd_pins {
+//         group1 {
+//             psels = <NRF_PSEL(SPIM_SCK, 0, 8)>,
+//                     <NRF_PSEL(SPIM_MOSI, 0, 9)>,
+//                     <NRF_PSEL(SPIM_MISO, 0, 10)>;
+//         };
+//     };
+// };
 
 
 &clock {
@@ -71,8 +70,8 @@
 &pinctrl {
 	pdm0_default_alt: pdm0_default_alt {
 		group1 {
-			psels = <NRF_PSEL(PDM_CLK, 1, 6)>,
-				<NRF_PSEL(PDM_DIN, 0, 24)>;
+			psels = <NRF_PSEL(PDM_CLK, 0, 18)>,
+				<NRF_PSEL(PDM_DIN, 0, 27)>;
 		};
 	};
 };
