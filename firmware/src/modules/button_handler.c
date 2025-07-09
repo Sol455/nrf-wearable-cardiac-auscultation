@@ -46,7 +46,6 @@ static void btn1_callback(const struct device *dev, struct gpio_callback *cb, ui
 
 int button_handler_init(void)
 {
-    int ret;
 
     if (!device_is_ready(btn0.port) || !device_is_ready(btn1.port)) {
         LOG_ERR("Button GPIOs not ready");

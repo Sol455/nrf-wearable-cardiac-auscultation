@@ -22,7 +22,7 @@ class PeakProcessor:
                         cardiac_period_samples = s1_idx_curr - s1_idx_prev
                         pre_samples = self.compute_pre_samples(cardiac_period_samples, pre_samples_ratio, pre_min_samples, pre_max_samples)
                         window_start_index = s1_idx_prev - pre_samples
-                        print(f"PRE: {pre_samples}")
+                        #print(f"PRE: {pre_samples}")
                         window = slab_buffer.extract_window(s1_idx_prev, s1_idx_curr, pre_samples, -pre_samples)
                         if window is not None:
                             self.peak_process_fn(window, window_start_index)

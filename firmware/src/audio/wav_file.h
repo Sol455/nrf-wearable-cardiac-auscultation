@@ -13,15 +13,6 @@
 
 #define WAV_FORMAT_PCM 1
 
-typedef struct {
-	struct fs_file_t *wav_file;
-	char* file_name;
-	uint32_t length; 
-	uint16_t sample_rate;
-	uint16_t bytes_per_sample; 
-	uint16_t num_channels;
-} WavConfig;
-
 /* WAV header */
 struct wav_header {
 	/* RIFF Header */
@@ -43,6 +34,16 @@ struct wav_header {
 	uint32_t data_bytes; /* Number of bytes in data */
 } __packed;		     // 44 bytes
 
+typedef struct {
+	struct fs_file_t *wav_file;
+	char file_name[32];
+	uint32_t length; 
+	uint16_t sample_rate;
+	uint16_t bytes_per_sample; 
+	uint16_t num_channels;
+	struct wav_header header;
+} WavConfig;
+
 int read_wav_header(struct fs_file_t *wav_file, struct wav_header *header);
 
 int write_wav_header(struct fs_file_t *wav_file, uint32_t size, uint16_t sample_rate,
@@ -51,5 +52,9 @@ int write_wav_header(struct fs_file_t *wav_file, uint32_t size, uint16_t sample_
 int write_wav_data(struct fs_file_t *wav_file, const char *buffer, uint32_t size);
 
 int open_wav_for_write(WavConfig *wav_config);
+
+int open_wav_for_read(WavConfig *wav_config);
+
+int read_wav_block(WavConfig *wav_config, int16_t *buffer, size_t samples_per_block);
 
 #endif

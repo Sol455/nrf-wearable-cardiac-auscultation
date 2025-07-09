@@ -7,30 +7,27 @@
 #include "wav_file.h"
 #include <nrfx_pdm.h>
 #include "../macros.h"
+#include "dsp/rt_peak_detector.h"
+#include "dsp/peak_validator.h"
+#include "dsp/peak_processor.h"
+#include "dsp/window_analysis.h"
 
 typedef struct {
-    WavConfig wav_config;
-    const struct device *const dmic_ctx;
-    //struct k_mem_slab *mem_slab; 
-    nrf_pdm_gain_t pdm_gain;
-} AudioStream;
+    struct k_mem_slab *mem_slab; 
+    RTPeakConfig rt_peak_config;
+    RTPeakValConfig rt_peak_val_config;
+    PeakProcessorConfig peak_processor_config;
+    WindowAnalysisConfig window_analysis_config
+} AudioStreamConfig;
 
-struct save_wave_msg {
-	void *buffer;
-	size_t size;
-	struct fs_file_t *audio_file
-};
+void init_audio_stream(AudioStreamConfig audio_stream_config);
 
-int pdm_init(AudioStream * audio_stream);
-
-int capture_audio(AudioStream *audio_stream);
-
-void process_audio();
-
-void generate_filename(char *filename_out, size_t max_len);
+struct k_msgq *audio_stream_get_msgq();
+struct k_msgq *audio_stream_get_peak_msgq();
+void consume_audio();
 
 //Audio Transmission Functions
-const int16_t *get_audio_buffer(void);          
-size_t get_audio_buffer_length(void);
+const int16_t *get_audio_buffer();          
+size_t get_audio_buffer_length();
 
 #endif

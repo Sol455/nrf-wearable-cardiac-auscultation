@@ -1,20 +1,191 @@
-#include "audio_stream.h"
 #include <zephyr/logging/log.h>
 #include <stdio.h>
+#include "audio_stream.h"
+#include "audio_in.h"
+#include "arm_math.h"
+#include "dsp/filters/bandpass_coeffs.h"
+#include "dsp/filters/lowpass_coeffs.h"
+#include "dsp/circular_block_buffer.h"
 
 #define MEM_SLAB_BLOCK_COUNT 8
 #define AUDIO_BUF_TOTAL_SIZE WAV_LENGTH_BLOCKS * MAX_BLOCK_SIZE
 
+#define PEAK_PROCESSING_STACK_SIZE CONFIG_MAIN_STACK_SIZE
+#define PEAK_PROCESSING_PRIORITY 5
+
 LOG_MODULE_REGISTER(audio_stream);
-K_MSGQ_DEFINE(device_message_queue, sizeof(struct save_wave_msg), 8, 4);
+K_MSGQ_DEFINE(audio_input_message_queue, sizeof(audio_slab_msg), 8, 4);
+K_MSGQ_DEFINE(peak_message_queue, sizeof(RTPeakMessage), 8, 4);
 
-K_MEM_SLAB_DEFINE_STATIC(mem_slab, MAX_BLOCK_SIZE, MEM_SLAB_BLOCK_COUNT, 4); //align mem slab to 4 bytes
+AudioStreamConfig _audio_stream_config;
 
-uint8_t writing = 0;
+CircularBlockBuffer _block_buffer;
+RTPeakDetector _rt_peak_detector;
+RTPeakValidator _rt_peak_validator;
+RTPeakValidator _rt_peak_validator;
+PeakProcessor _peak_processor;
+WindowAnalysis _window_analyser;
 
-//Debug audio streaming config
+struct k_msgq *audio_stream_get_msgq() {
+    return &audio_input_message_queue;
+}
+
+struct k_msgq *audio_stream_get_peak_msgq() {
+    return &peak_message_queue;
+}
+
+float32_t bp_state[4 * NUM_STAGES_BP];
+arm_biquad_casd_df1_inst_f32 bp_inst;
+
+float32_t lp_state[4 * NUM_STAGES_LP];
+arm_biquad_casd_df1_inst_f32 lp_inst;
+
+void init_filters() {
+    arm_biquad_cascade_df1_init_f32(
+        &bp_inst,
+        NUM_STAGES_BP,
+        bandpass_coeffs,
+        bp_state
+    );
+    arm_biquad_cascade_df1_init_f32(
+        &lp_inst,
+        NUM_STAGES_LP,
+        lowpass_coeffs,
+        lp_state
+    );
+}
+void peak_processor_send_function(const float *window, int32_t window_start_idx, int32_t window_len) {
+
+    wa_set_audio_window(&_window_analyser, window, window_len, window_start_idx);
+
+    //1.0 get window timestamp
+    int32_t window_time_ms = (int32_t)(((float)window_start_idx / (float)MAX_SAMPLE_RATE) * 1000.0f);
+
+    float window_mean = compute_mean_abs(window, window_len);
+    //2.0 Hard limit audio
+    //hard_limit(window, window_len, window_mean, _audio_stream_config.window_analysis_config.audio_hl_thresh, limited_window_buf);
+
+    //3.0 Calculte STE Profile
+    wa_calc_ste_blocks(&_window_analyser);
+    //4.0 Calculte STE mean & Hard Limit
+    wa_calc_ste_mean(&_window_analyser);
+    wa_hard_limit_ste(&_window_analyser);
+
+    //5.0 Find candidate STE peaks
+    wa_find_peaks_window(&_window_analyser);
+    //6.0 Remove peak clusters, find biggest peak in each
+    wa_remove_close_peaks(&_window_analyser);
+    
+    //7.0 Identify S1 and S2 peaks via timings and ratio of cardiac period
+    wa_label_S1_S2_by_fraction(&_window_analyser);
+    
+    //8.0 Identify peaks in audio window from STE peaks
+    wa_assign_audio_peaks(&_window_analyser);
+    //8. perform FFT on window and calc RMS
+    wa_extract_peak_features(&_window_analyser);
+
+    //9. Create heart beat event and publish
+    wa_make_send_ble(&_window_analyser);
+
+    LOG_INF("Window sent: start %d, len %d, first %f, mean: %f, ste_mean: %f, ste num_peaks: %d", window_start_idx, window_len, window[0], window_mean, _window_analyser.ste_mean, _window_analyser.num_peaks);
+
+}
+
+void init_audio_stream(AudioStreamConfig audio_stream_config) {
+    _audio_stream_config = audio_stream_config;
+    init_filters();
+    cbb_init(&_block_buffer, CB_NUM_BLOCKS, BLOCK_SIZE_SAMPLES);
+    rt_peak_detector_init(&_rt_peak_detector, &_audio_stream_config.rt_peak_config);
+    rt_peak_validator_init(&_rt_peak_validator, &_audio_stream_config.rt_peak_val_config);
+    peak_processor_init(&_peak_processor, &_audio_stream_config.peak_processor_config, peak_processor_send_function);
+    wa_init(&_window_analyser,  &_audio_stream_config.window_analysis_config);
+
+}
+
+float32_t f32_buf[BLOCK_SIZE_SAMPLES];
+int16_t out_q15[BLOCK_SIZE_SAMPLES];
+float32_t envelope_buf[BLOCK_SIZE_SAMPLES];
+
+int debug_peak_count = 0;
+
+void _process_block(audio_slab_msg *msg) {
+
+    int ret = 0;
+    #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
+        write_to_buffer(&msg);
+    #endif
+    //1. Write filtered audio to ring buffer
+    float *block_to_write = cbb_get_write_block(&_block_buffer);
+    arm_q15_to_float((int16_t *)msg->buffer, f32_buf, BLOCK_SIZE_SAMPLES); //Convert to F32
+    arm_biquad_cascade_df1_f32(&bp_inst, f32_buf, block_to_write, BLOCK_SIZE_SAMPLES); // Filter into slab buffer
+    cbb_advance_write_index(&_block_buffer); //Advance slab buffer index for next run
+    k_mem_slab_free(audio_in_get_mem_slab(), msg->buffer);
+
+
+    // arm_float_to_q15(f32_buf, out_q15, BLOCK_SIZE_SAMPLES); // Convert back to int for saving to file
+    // ret = write_wav_data(msg->audio_output_file, (const char *)out_q15, msg->size); // write to wav file
+
+    //2. Generate envelope
+    arm_abs_f32(block_to_write, envelope_buf, BLOCK_SIZE_SAMPLES);
+    arm_biquad_cascade_df1_f32(&lp_inst, envelope_buf, envelope_buf, BLOCK_SIZE_SAMPLES);
+
+    //3. Peak Detection
+    int32_t block_absolute_start = cbb_get_absolute_sample_index(&_block_buffer) - cbb_get_block_size(&_block_buffer);
+
+    for (int i = 0; i < BLOCK_SIZE_SAMPLES; i++) {
+        int32_t abs_idx_of_sample = block_absolute_start + i;
+        RTPeakMessage peak_msg;
+        bool found = rt_peak_detector_update(&_rt_peak_detector, envelope_buf[i], abs_idx_of_sample, &peak_msg);
+        if (found) {
+            ret = rt_peak_validator_notify_peak(&_rt_peak_validator, peak_msg);
+            debug_peak_count++;
+            LOG_INF("Peak at global idx %d, value %f, running peak_total: %d", peak_msg.global_index, (double)peak_msg.value, debug_peak_count);
+        }
+    }
+
+
+    if (ret != 0) {
+        LOG_ERR("Failed to write to file, rc=%d", ret);
+        return;
+    }
+}
+
+void consume_audio() {
+    audio_slab_msg msg;
+    int ret = 0;
+
+    while(1) {
+        if (k_msgq_get(&audio_input_message_queue, &msg, K_FOREVER) == 0) {
+            if (msg.msg_type == AUDIO_BLOCK_TYPE_DATA) {
+                //LOG_INF("Consumer: Received data %p\n", msg.buffer);
+                _process_block(&msg);
+            } else if (msg.msg_type == AUDIO_BLOCK_TYPE_STOP) {
+                audio_in_stop();
+            }
+
+            //LOG_INF("Written Data sucessfully");
+            }
+    }   
+}
+
+void process_peaks() { 
+    RTPeakMessage msg;
+    int ret = 0;
+
+    while(1) {
+        ret = k_msgq_get(&peak_message_queue, &msg, K_FOREVER);
+        if (ret == 0) {
+            LOG_INF("process_peaks: Got peak type %d, global_index %d", msg.type, msg.global_index);
+            peak_processor_process_peak(&_peak_processor, &msg, &_block_buffer);
+            // Process the message
+        } else {
+            LOG_ERR("process_peaks: k_msgq_get error %d", ret);
+        }
+    }   
+}
+
+//Debug audio transmission config via BLE
 #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
-
 static int16_t audio_buf[AUDIO_BUF_TOTAL_SIZE];
 static size_t audio_buf_offset = 0;
 
@@ -28,7 +199,7 @@ size_t get_audio_buffer_length(void)
 	return audio_buf_offset;
 }
 
-void write_to_buffer(const struct save_wave_msg *msg)
+void write_to_buffer(const audio_slab_msg *msg)
 {
     size_t num_samples = msg->size / sizeof(int16_t);
     const int16_t *src = (const int16_t *)msg->buffer;
@@ -43,135 +214,7 @@ void write_to_buffer(const struct save_wave_msg *msg)
 
     LOG_INF("Wrote %u int16_t samples to audio_buf (offset now %u)", num_samples, audio_buf_offset);
 }
-
 #endif
 
-int pdm_init(AudioStream * audio_stream) {
-    if (!device_is_ready(audio_stream->dmic_ctx)) {
-        LOG_ERR("%s is not ready", audio_stream->dmic_ctx);
-        return 0;
-    }
-
-    struct pcm_stream_cfg stream = {
-        .pcm_width = SAMPLE_BIT_WIDTH,
-        .mem_slab  = &mem_slab,
-    };
-
-    struct dmic_cfg cfg = {
-        .io = {
-            .min_pdm_clk_freq = 1000000,
-            .max_pdm_clk_freq = 3500000,
-            .min_pdm_clk_dc   = 40,
-            .max_pdm_clk_dc   = 60,
-        },
-        .streams = &stream,
-        .channel = {
-            .req_num_streams = 1,
-        },
-    };
-
-    cfg.channel.req_num_chan = 1;
-    cfg.channel.req_chan_map_lo =
-        dmic_build_channel_map(0, 0, PDM_CHAN_LEFT);
-    cfg.streams[0].pcm_rate = MAX_SAMPLE_RATE;
-    cfg.streams[0].block_size = BLOCK_SIZE(cfg.streams[0].pcm_rate, cfg.channel.req_num_chan);
-
-    int ret = dmic_configure(audio_stream->dmic_ctx, &cfg);
-    if (ret < 0) {
-        LOG_ERR("Failed to configure the driver: %d", ret);
-        return ret;
-    }
-    nrf_pdm_gain_set(NRF_PDM0_S, audio_stream->pdm_gain, audio_stream->pdm_gain);
-    uint8_t l_gain, r_gain;
-    nrf_pdm_gain_get(NRF_PDM0_S, &l_gain, &r_gain);
-    LOG_INF("LEFT GAIN: %d, RIGHT GAIN: %d", l_gain, r_gain);
-    return 0;
-}
-
-void process_audio() {
-    struct save_wave_msg msg;
-
-    while(1) {
-        if (k_msgq_get(&device_message_queue, &msg, K_FOREVER) == 0) {
-            LOG_INF("Consumer: Received data %p\n", msg.buffer);
-            int ret = 0;
-            if(ret!=0) {
-                LOG_ERR("Failed to write wav header");
-            }
-
-            #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
-            write_to_buffer(&msg);
-            #endif
-            ret = write_wav_data(msg.audio_file, msg.buffer, msg.size);
-            //PROCESS AUDIO / DSP HERE:
-            //
-
-            k_mem_slab_free(&mem_slab, msg.buffer);
-            if (ret != 0) {
-                LOG_ERR("Failed to write to file, rc=%d", ret);
-                return;
-            }
-            LOG_INF("Written Data sucessfully");
-            writing = 0;
-
-        }
-    }
-}
-
-void stop_capture(struct device *dmic_dev, struct fs_file_t *audio_file) {
-    int ret = dmic_trigger(dmic_dev, DMIC_TRIGGER_STOP);
-    if (ret < 0) {
-        LOG_ERR("STOP trigger failed: %d", ret);
-    }
-    sd_card_close(audio_file);
-}
-
-//main thread
-int capture_audio(AudioStream *audio_stream)
-{
-int ret;
-struct save_wave_msg msg;
-
-ret = dmic_trigger(audio_stream->dmic_ctx, DMIC_TRIGGER_START);
-    if (ret < 0) {
-        LOG_ERR("START trigger failed: %d", ret);
-        return ret;
-    }
-
-for (int  i = 0; i < WAV_LENGTH_BLOCKS; i ++) {
-    ret = dmic_read(audio_stream->dmic_ctx, 0, &msg.buffer, &msg.size, READ_TIMEOUT);
-    if (ret < 0) {
-        LOG_ERR("%d - read failed: %d", i, ret);
-        return ret;
-    }
-    msg.audio_file = audio_stream->wav_config.wav_file;
-    LOG_INF("%d - got buffer %p of %u bytes", i, msg.buffer, msg.size);
-    writing = 1;
-    ret = k_msgq_put(&device_message_queue, &msg, K_NO_WAIT);
-
-    if (ret < 0) {
-    LOG_ERR("Failed to enqueue message: %d", ret);
-    return ret;
-    }
-}
-
-//@TO-DO, get rid of this, remove global writing flag
-while (1) {
-    if (writing == 0){
-        stop_capture(audio_stream->dmic_ctx, audio_stream->wav_config.wav_file);
-        break;
-    } else  {
-        k_sleep(K_MSEC(100));
-    }
-}
-
-LOG_INF("Audio Capture Finished");
-
-return ret;
-}
-
-void generate_filename(char *filename_out, size_t max_len) {
-    static uint32_t file_counter = 0;
-    snprintf(filename_out, max_len, "%08u.wav", file_counter++);}
-
-K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, process_audio, NULL, NULL, NULL, 3, 0, 0);
+K_THREAD_DEFINE(subscriber_task_id, CONFIG_MAIN_STACK_SIZE, consume_audio, NULL, NULL, NULL, 3, 0, 0);
+K_THREAD_DEFINE(peak_processing_thread_id, PEAK_PROCESSING_STACK_SIZE, process_peaks,  NULL, NULL, NULL, PEAK_PROCESSING_PRIORITY, 0, 0);

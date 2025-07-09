@@ -4,6 +4,8 @@
 #include "modules/led_controller.h"
 #include "ble/ble_manager.h"
 #include "ble/heart_service.h"
+#include "audio/audio_in.h"
+#include "audio/audio_stream.h"
 
 LOG_MODULE_REGISTER(event_handler);
 
@@ -18,11 +20,11 @@ typedef enum {
 } AppState;
 
 static AppState app_state = STATE_IDLE;
-static AudioStream *audio_stream_ptr = NULL;
+//static AudioStream *audio_stream_ptr = NULL;
 
-void event_handler_set_audio_stream(AudioStream *audio_stream) {
-    audio_stream_ptr = audio_stream;
-}
+// void event_handler_set_audio_stream(AudioStream *audio_stream) {
+//     audio_stream_ptr = audio_stream;
+// }
 
 void event_handler_post(AppEvent evt)
 {
@@ -49,33 +51,86 @@ void _send_demo_heartbeat_packet()
     }
 }
 
+#if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
+void _transmit_audio_ble() {
+    //Send Via BLE
+    const int16_t *buf = get_audio_buffer();
+    size_t len_samples = get_audio_buffer_length();
+
+    if (buf && len_samples > 0) {
+        size_t len_bytes = len_samples * sizeof(int16_t);
+        int ret = transmit_audio_buffer((const uint8_t *)buf, len_bytes);
+        if (ret) {
+            LOG_ERR("Failed to transmit audio buffer: %d", ret);
+        } else {
+            LOG_INF("Audio buffer transmitted successfully.");
+        }
+        } else {
+        LOG_WRN("No audio buffer available to transmit.");
+    }
+}
+#endif
+
+//===========================================FSM State function wrappers===================================
+void _advertise() {
+    led_controller_start_blinking(K_MSEC(500));
+    ble_advertise();
+    app_state = STATE_ADVERTISING;
+}
+
+void _connect() {
+    led_controller_stop_blinking();
+    led_controller_on();
+    //led_set_mode(LED_OFF);
+    app_state = STATE_CONNECTED;
+}
+
+void _read_in_audio() {
+    led_controller_start_blinking(K_MSEC(150));
+    audio_in_start();
+    #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
+        _transmit_audio_ble();
+    #endif
+    led_controller_stop_blinking();
+    led_controller_on();
+}
+
+// int _read_wav() {
+//     static struct fs_file_t read_wav_file;
+//         WavConfig read_wav_config = {
+//         .wav_file = &read_wav_file,
+//         .file_name = "00000000.wav",
+//     };
+//     led_controller_start_blinking(K_MSEC(150));
+//     int ret = open_wav_for_read(&read_wav_config);
+//     if (ret == 0) {
+//         printk("WAV: %d Hz, %d ch, %d bits/sample\n",
+//             read_wav_config.header.sample_rate,
+//             read_wav_config.header.num_channels,
+//             read_wav_config.header.bit_depth);
+//     }
+//     producer_capture_audio_from_wav(&read_wav_config);
+//     // Now read audio blocks as needed!
+//     //capture_audio(audio_stream_ptr);
+//     return ret;
+//}
+
+
+//========================================================================================================
+
 static void handle_event(AppEvent evt)
 {
     int ret;
     switch (app_state) {
         case STATE_IDLE:
-            if (evt.type == EVENT_BUTTON_0_PRESS && audio_stream_ptr != NULL) {
-                led_controller_start_blinking(K_MSEC(500));
-                ble_advertise();
-                app_state = STATE_ADVERTISING;
+            if (evt.type == EVENT_BUTTON_0_PRESS) {
+                //_read_in_audio();
+                _advertise();
             }
             break;
-            // if (evt.type == EVENT_BUTTON_0_PRESS && audio_stream_ptr != NULL) {
-            //     led_controller_stop_blinking();
-            //     led_controller_on();
-            //     int ret = open_wav_for_write(&audio_stream_ptr->wav_config);
-            //     capture_audio(audio_stream_ptr);
-            //     led_controller_off();
-            //     //ble_start_advertising();
-            //     app_state = STATE_STREAMING;
-            // }
-            // break;
         case STATE_ADVERTISING:
             if (evt.type == EVENT_BLE_CONNECTED) {
-                led_controller_stop_blinking();
-                led_controller_on();
-                //led_set_mode(LED_OFF);
-                app_state = STATE_CONNECTED;
+                _connect();
             }
             break;
 
@@ -88,42 +143,11 @@ static void handle_event(AppEvent evt)
             }
             //Record Audio to SD Card and then stream over BLE
             if (evt.type == EVENT_BLE_RECORD) {
-                //Record Audio
-                led_controller_start_blinking(K_MSEC(150));
-                static char filename[MAX_FILENAME_LEN];
-                generate_filename(filename, sizeof(filename));
-                audio_stream_ptr->wav_config.file_name = filename;
-                ret = open_wav_for_write(&audio_stream_ptr->wav_config);
-                capture_audio(audio_stream_ptr);
-
-                #if !IS_ENABLED(CONFIG_HEART_PATCH_DSP_MODE)
-                //Send Via BLE
-                const int16_t *buf = get_audio_buffer();
-                size_t len_samples = get_audio_buffer_length();
-
-                if (buf && len_samples > 0) {
-                    size_t len_bytes = len_samples * sizeof(int16_t);
-                    int err = transmit_audio_buffer((const uint8_t *)buf, len_bytes);
-                    if (err) {
-                        LOG_ERR("Failed to transmit audio buffer: %d", err);
-                    } else {
-                        LOG_INF("Audio buffer transmitted successfully.");
-                    }
-                } else {
-                    LOG_WRN("No audio buffer available to transmit.");
-                }
-                #endif
-
-                led_controller_stop_blinking();
-                led_controller_on();
+                _read_in_audio();
             }
             // if (evt.type = EVENT_BLE_DISCONNECTED) {
             //     app_state = STATE_IDLE;
             //     led_controller_off();
-            // }
-            // if (evt.type = EVENT_BLE_TOGGLE_LED) {
-            //     bool state = *(bool *)(evt.data);
-            //     led_controller_set(state);
             // }
             break;
 

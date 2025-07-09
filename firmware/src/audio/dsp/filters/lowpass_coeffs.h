@@ -1,0 +1,15 @@
+// Auto-generated CMSIS-DSP biquad coefficients
+#ifndef LOWPASS_COEFFS_H
+#define LOWPASS_COEFFS_H
+
+#define NUM_STAGES_LP 1
+
+float lowpass_coeffs[] = {
+    0.00000649,
+    0.00001298,
+    0.00000649,
+    1.99278035,
+    -0.99280631,
+};
+
+#endif

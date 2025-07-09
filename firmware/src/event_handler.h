@@ -1,7 +1,7 @@
 #ifndef EVENT_HANDLER_H_
 #define EVENT_HANDLER_H_
 
-#include "audio/audio_stream.h"
+//#include "audio/audio_stream.h"
 
 int event_handler_run(void);  
 
@@ -26,6 +26,5 @@ typedef struct {
 
 void event_handler_post(AppEvent evt);
 
-void event_handler_set_audio_stream(AudioStream *stream);
 
 #endif

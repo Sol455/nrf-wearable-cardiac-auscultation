@@ -1,6 +1,7 @@
 build*/
 .vscode/settings.json
 firmware/.vscode/settings.json
+firmware/.vscode/
 
 # Python
 python_dsp/__pycache__/
@@ -24,3 +25,5 @@ python_dsp/.vscode/
 *.dat
 *.pyc
 *.png
+firmware/.vscode/settings.json
+firmware/.vscode/settings.json
