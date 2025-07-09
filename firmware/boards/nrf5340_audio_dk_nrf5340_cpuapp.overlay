@@ -83,3 +83,6 @@ dmic_dev: &pdm0 {
 	clock-source = "ACLK";
 };
 
+&uart1 {
+    status = "disabled";
+};

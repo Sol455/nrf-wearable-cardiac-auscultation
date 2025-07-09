@@ -112,7 +112,27 @@ int main(void)
 
 	init_audio_stream(audio_stream_config);
 
-    //Start up the application
+    // const struct device *gpio1 = DEVICE_DT_GET(DT_NODELABEL(gpio1));
+
+    // if (!device_is_ready(gpio1)) {
+    //     printk("GPIO1 not ready!\n");
+    // }
+
+    // // Pin number 6 on Port 1
+    // int pin = 6;
+
+    // // Configure pin as output, initially low
+    // ret = gpio_pin_configure(gpio1, pin, GPIO_OUTPUT_INACTIVE);
+    // if (ret != 0) {
+    //     printk("Error %d: failed to configure P1.06\n", ret);
+    // }
+
+    // // Set pin high
+    // gpio_pin_set(gpio1, pin, 1);
+
+    // printk("P1.06 should now be HIGH!\n");
+
+    // //Start up the application
     AppEvent ev = { .type = EVENT_START_UP};
     event_handler_post(ev);
 	
