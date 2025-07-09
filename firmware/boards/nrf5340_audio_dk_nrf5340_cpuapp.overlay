@@ -71,7 +71,7 @@
 	pdm0_default_alt: pdm0_default_alt {
 		group1 {
 			psels = <NRF_PSEL(PDM_CLK, 0, 18)>,
-				<NRF_PSEL(PDM_DIN, 0, 27)>;
+				<NRF_PSEL(PDM_DIN, 0, 17)>;
 		};
 	};
 };
