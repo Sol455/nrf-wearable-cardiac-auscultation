@@ -14,6 +14,15 @@ config HEART_PATCH_DSP_MODE
       Disable to use Download/Raw Audio mode.
 endmenu
 
+menu "SD enable mode"
+
+config SD_CARD_SUPPORT
+    bool "Enable SD card support"
+    default n
+    help
+      Enable SD card recording and storage features.
+endmenu
+
 menuconfig NRF5340_AUDIO
 	 bool "nRF5340 Audio [EXPERIMENTAL]"
 	 select EXPERIMENTAL

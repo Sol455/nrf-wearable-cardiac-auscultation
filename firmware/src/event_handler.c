@@ -73,6 +73,7 @@ void _transmit_audio_ble() {
 
 //===========================================FSM State function wrappers===================================
 void _advertise() {
+    //led_controller_on();
     led_controller_start_blinking(K_MSEC(500));
     ble_advertise();
     app_state = STATE_ADVERTISING;
