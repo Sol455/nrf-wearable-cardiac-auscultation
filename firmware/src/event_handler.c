@@ -125,7 +125,6 @@ static void handle_event(AppEvent evt)
     switch (app_state) {
         case STATE_IDLE:
             if (evt.type == EVENT_BUTTON_0_PRESS) {
-                //_read_in_audio();
                 _advertise();
             }
             break;

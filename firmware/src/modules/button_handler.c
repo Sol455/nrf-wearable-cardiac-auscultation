@@ -52,7 +52,7 @@ int button_handler_init(void)
         return -ENODEV;
     }
 
-    gpio_pin_configure_dt(&btn0, GPIO_INPUT);
+    gpio_pin_configure_dt(&btn0, GPIO_INPUT | GPIO_PULL_DOWN);
     //gpio_pin_configure_dt(&btn1, GPIO_INPUT);
 
     gpio_pin_interrupt_configure_dt(&btn0, GPIO_INT_EDGE_TO_ACTIVE);
