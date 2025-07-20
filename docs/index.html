@@ -61,9 +61,8 @@
     <div class="card">
       <h2 class="mb-4">Heart Sound Patch Dashboard</h2>
       <div class="mb-3 d-flex align-items-center flex-wrap gap-2">
-        <button class="btn btn-secondary" id="testTrendBtn">Test Trend Lines</button>
         <button class="btn btn-success" onclick="connectBLE()">Connect</button>
-        <button class="btn btn-warning" onclick="sendControlCommand(0x01)">Record</button>
+        <button class="btn btn-warning" onclick="sendControlCommand(0x01)">Capture</button>
         <button class="btn btn-info" onclick="downloadWavFromBuffer()">Download</button>
         <span id="bleStatus" class="text-muted ms-2">Not connected</span>
       </div>
@@ -166,6 +165,9 @@
             beginAtZero: true,
             title: { display: true, text: 'RMS' }
           }
+        },
+        plugins: {
+          legend: { display: false }
         }
       }
     });
@@ -194,7 +196,7 @@
           {
             label: 'Centroid Trend',
             data: [],
-            borderColor: '#dc3545', 
+            borderColor: '#dc3545',
             borderWidth: 2,
             fill: false,
             pointRadius: 0,
@@ -223,40 +225,11 @@
             beginAtZero: true,
             title: { display: true, text: 'Spectral Centroid (Hz)' }
           }
+        },
+        plugins: {
+          legend: { display: false }
         }
       }
-    });
-
-
-    const testSlopes = [-0.012041102163, -0.012041102163, -0.012041102163, -0.012041102163];
-    let testSlopeIndex = 0;
-
-    document.getElementById('testTrendBtn').addEventListener('click', () => {
-      if (rmsData.length === 0) return;
-
-      const first = rmsData[0];
-      const last = rmsData[rmsData.length - 1];
-
-      const slope = testSlopes[testSlopeIndex];
-      testSlopeIndex = (testSlopeIndex + 1) % testSlopes.length;
-
-      const timeSpanS = (last.x.getTime() - first.x.getTime()) / 1000;
-      const intercept = last.y - slope * (last.x.getTime() / 1000);
-
-      let startVal = slope * (first.x.getTime() / 1000) + intercept;
-      if (startVal < 0) startVal = 0;
-
-      const trendLineData = [
-        { x: first.x, y: startVal },
-        { x: last.x, y: last.y }
-      ];
-
-      const trendDataset = rmsChart.data.datasets.find(ds => ds.label === 'RMS Trend');
-      trendDataset.data = trendLineData;
-
-      rmsChart.update();
-
-      updateStatus(`Test Trend Line slope: ${slope.toExponential(2)} RMS/s`, false);
     });
 
     function updateRMSTrendLineWithSlope(slope) {
@@ -285,7 +258,7 @@
     }
 
     function updateCentroidTrendLineWithSlope(slope) {
-      if (centroidData.length < 15) return;  
+      if (centroidData.length < 15) return;
 
       const first = centroidData[0];
       const last = centroidData[centroidData.length - 1];
@@ -441,16 +414,18 @@
       updateStatus(`RMS: ${rms.toFixed(1)}, Centroid: ${centroid.toFixed(1)} Hz`, false);
     }
 
-    function addAlertMessage(msg) {
-      const alertFeed = document.getElementById('alertFeed');
-      const alertItem = document.createElement('div');
-      alertItem.className = 'status-alert mb-2';  
-      alertFeed.appendChild(alertItem);
 
-      setTimeout(() => {
-        alertFeed.removeChild(alertItem);
-      }, 30000);
-    }
+  function addAlertMessage(msg) {
+    const alertFeed = document.getElementById('alertFeed');
+    const alertItem = document.createElement('div');
+    alertItem.className = 'status-alert mb-2';
+    alertItem.innerText = msg;  
+    alertFeed.appendChild(alertItem);
+
+    setTimeout(() => {
+      alertFeed.removeChild(alertItem);
+    }, 30000);
+  }
 
     function handleAlertNotification(event) {
       const dv = event.target.value;
