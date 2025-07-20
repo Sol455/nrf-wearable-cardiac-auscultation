@@ -192,13 +192,16 @@ def calc_centroid(signal, fs):
 
     return freqs, Y_dB, centroid
 
-def make_window_event(window, ste, window_time_ms):
+def make_window_event(window, ste, window_time_ms, window_start_index):
     cardiac_window_event = {
         "cardiac_period": len(window),
+        "period_time_stamp_N": window_start_index,
         "period_time_stamp_ms": window_time_ms,
         "ste_profile": ste,  # e.g. list or np.array, as appropriate
+        "S1_time_stamp" : "unval",
         "S1_rms": "unval",
         "S1_centroid": "unval",
+        "S2_time_stamp" : "unval",
         "S2_rms": "unval",
         "S2_centroid": "unval",
         "debug_S1_fft_freq": "unval",
@@ -213,18 +216,27 @@ def populate_window_features(window_event, peaks, window, fs, s_window_size):
         if peak['type'] not in ('S1', 'S2'):
             continue  # Skip non-heart-sound peaks
         peak_index = peak['audio_index']
+
+        time_stamp_samples = window_event["period_time_stamp_N"] + peak["audio_index"]
+        time_stamp_s = time_stamp_samples / fs 
+        time_stamp_ms = time_stamp_samples / fs * 1000
+        
         s_window = extract_fixed_window(window, peak_index, s_window_size)
         rms = calc_rms(s_window)
         freqs, Y_dB, spectral_centroid = calc_centroid(s_window, fs)
-        print(f"RMS: {rms}, CENTROID: {spectral_centroid}")
+        #print(f"RMS: {rms}, CENTROID: {spectral_centroid}")
         if peak['type'] == 'S1':
+            window_event["S1_time_stamp"] = time_stamp_s
             window_event["S1_rms"] = rms
             window_event["S1_centroid"] = spectral_centroid
             window_event["debug_S1_fft_freq"] = freqs
             window_event["debug_S1_y_dB"] = Y_dB
         elif peak['type'] == 'S2':
+            window_event["S2_time_stamp"] = time_stamp_s
             window_event["S2_rms"] = rms
             window_event["S2_centroid"] = spectral_centroid
             window_event["debug_S2_fft_freq"] = freqs
             window_event["debug_S2_y_dB"] = Y_dB
+
+        #print(time_stamp_ms)
     return window_event

@@ -27,3 +27,4 @@ python_dsp/.vscode/
 *.png
 firmware/.vscode/settings.json
 firmware/.vscode/settings.json
+*.asd
