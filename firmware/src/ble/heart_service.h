@@ -33,6 +33,8 @@ struct heart_packet {
 	float rms;
 	float centroid;
 	uint32_t timestamp_ms;
+	float rms_trend;
+	float centroid_trend;
 } __packed;
 
 typedef void (*heart_control_cb_t)(uint8_t opcode);

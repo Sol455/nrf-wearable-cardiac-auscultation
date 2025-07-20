@@ -98,7 +98,7 @@
 
 
   <script>
-    const MAX_POINTS = 50;
+    const MAX_POINTS = 30;
     let rmsData = [];
     let centroidData = [];
     let connectionStart = null;
@@ -190,6 +190,15 @@
             pointRadius: 5,
             type: 'line',
             showLine: false
+          },
+          {
+            label: 'Centroid Trend',
+            data: [],
+            borderColor: '#dc3545', 
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 0,
+            tension: 0
           }
         ]
       },
@@ -250,7 +259,55 @@
       updateStatus(`Test Trend Line slope: ${slope.toExponential(2)} RMS/s`, false);
     });
 
+    function updateRMSTrendLineWithSlope(slope) {
+      if (centroidData.length < 15) {
+        return;  // Need at least 15 points before slop provided by MCU
+      }
+      const first = rmsData[0];
+      const last = rmsData[rmsData.length - 1];
 
+      const lastTimeS = last.x.getTime() / 1000;
+      const firstTimeS = first.x.getTime() / 1000;
+
+      const intercept = last.y - slope * lastTimeS;
+      let startVal = slope * firstTimeS + intercept;
+      if (startVal < 0) startVal = 0;
+
+      const trendLineData = [
+        { x: first.x, y: startVal },
+        { x: last.x, y: last.y }
+      ];
+
+      const trendDataset = rmsChart.data.datasets.find(ds => ds.label === 'RMS Trend');
+      trendDataset.data = trendLineData;
+
+      rmsChart.update();
+    }
+
+    function updateCentroidTrendLineWithSlope(slope) {
+      if (centroidData.length < 15) return;  
+
+      const first = centroidData[0];
+      const last = centroidData[centroidData.length - 1];
+
+      const firstTimeS = first.x.getTime() / 1000;
+      const lastTimeS = last.x.getTime() / 1000;
+
+      const intercept = last.y - slope * lastTimeS;
+
+      let startVal = slope * firstTimeS + intercept;
+      if (startVal < 0) startVal = 0;
+
+      const trendLineData = [
+        { x: first.x, y: startVal },
+        { x: last.x, y: last.y }
+      ];
+
+      const trendDataset = centroidChart.data.datasets.find(ds => ds.label === 'Centroid Trend');
+      trendDataset.data = trendLineData;
+
+      centroidChart.update();
+    }
 
 
     function updateStatus(message, isAlert) {
@@ -357,7 +414,8 @@
       const rms = dv.getFloat32(0, true);
       const centroid = dv.getFloat32(4, true);
       const timestampMs = dv.getUint32(8, true);
-
+      const rmsSlope = dv.getFloat32(12, true);
+      const centroidSlope = dv.getFloat32(16, true);
       const ts = new Date(connectionStart + timestampMs);  // align with browser time
 
       // Update RMS chart
@@ -376,17 +434,19 @@
       centroidChart.data.datasets[1].data = centroidData;
       centroidChart.update();
 
+      //update trend line with slope
+      updateRMSTrendLineWithSlope(rmsSlope);
+      updateCentroidTrendLineWithSlope(centroidSlope);
+
       updateStatus(`RMS: ${rms.toFixed(1)}, Centroid: ${centroid.toFixed(1)} Hz`, false);
     }
 
     function addAlertMessage(msg) {
       const alertFeed = document.getElementById('alertFeed');
       const alertItem = document.createElement('div');
-      alertItem.className = 'status-alert mb-2';  // Use your existing alert styling
-      alertItem.innerText = msg;
+      alertItem.className = 'status-alert mb-2';  
       alertFeed.appendChild(alertItem);
 
-      // Auto-remove alert after 10 seconds (optional)
       setTimeout(() => {
         alertFeed.removeChild(alertItem);
       }, 30000);
@@ -406,7 +466,6 @@
       }
 
       addAlertMessage(alertMsg);
-      //updateStatus(alertMsg, alertCode !== 0);  // Update main status line
     }
 
     if ('serviceWorker' in navigator) {

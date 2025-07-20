@@ -367,14 +367,15 @@ void wa_make_send_ble(WindowAnalysis *wa) {
             uint32_t absolute_sample_index = wa->window_start_idx + wa->peaks[i].audio_index;
             uint32_t timestamp_ms = (uint32_t)(((float)absolute_sample_index / (float)MAX_SAMPLE_RATE) * 1000.0f);
             packet.timestamp_ms = timestamp_ms;
-            bt_heart_service_notify_packet(&packet);
 
             float rms_slope, centroid_slope;
-
             trend_analyser_get_slope(&wa->ta_s1_rms, &rms_slope);
             trend_analyser_get_slope(&wa->ta_s1_centroid, &centroid_slope);
 
-            LOG_INF("S1_RMS_SLOPE: %f, CENTROID SLOPE %f", rms_slope, centroid_slope);
+            packet.rms_trend = rms_slope;
+            packet.centroid_trend = centroid_slope;
+
+            bt_heart_service_notify_packet(&packet);
 
             if(trend_analyser_is_alert(&wa->ta_s1_rms)) {
                 int ret = bt_heart_service_notify_alert(0x01);
