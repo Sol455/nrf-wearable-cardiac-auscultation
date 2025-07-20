@@ -41,11 +41,11 @@ int main(void)
 
 	WavConfig input_wav_config = {
 			.wav_file = &input_wav_file,
-			.file_name = "tri0.wav",
+			.file_name = "tri16muf.wav",
 	};
 
 	AudioInConfig audio_in_config = {
-		.audio_input_type = AUDIO_INPUT_TYPE_PDM,
+		.audio_input_type = AUDIO_INPUT_TYPE_WAV,
 		.input_wav_config = input_wav_config,
 		.output_wav_config = output_wav_config,
 		.dmic_ctx = DEVICE_DT_GET(DT_NODELABEL(pdm0)),
@@ -85,6 +85,15 @@ int main(void)
 		.ident_s1_s2_gap_r = 0.29,
 		.ident_s1_s2_gap_tol = 0.15,
 		.hs_window_size = HS_WINDOW_SIZE,
+
+		//Trend analysis
+	    .ta_rms_buf_size = TREND_ANALYSER_MAX_BUFFER,
+    	.ta_rms_slope_thresh = -0.015,
+    	.ta_rms_min_windows = 15,
+
+    	.ta_centroid_buf_size = TREND_ANALYSER_MAX_BUFFER,
+   		.ta_centroid_slope_thresh = -1.8,
+    	.ta_centroid_min_windows = 15,
 	};
 
 	AudioStreamConfig audio_stream_config = {

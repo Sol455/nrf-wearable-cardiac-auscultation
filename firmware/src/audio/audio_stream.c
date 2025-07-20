@@ -87,6 +87,8 @@ void peak_processor_send_function(const float *window, int32_t window_start_idx,
     //8. perform FFT on window and calc RMS
     wa_extract_peak_features(&_window_analyser);
 
+    wa_push_trends(&_window_analyser);
+
     //9. Create heart beat event and publish
     wa_make_send_ble(&_window_analyser);
 
@@ -171,7 +173,7 @@ void _process_block(audio_slab_msg *msg) { //process an incoming block of audio 
         arm_q15_to_float((int16_t *)msg->buffer, f32_buf, BLOCK_SIZE_SAMPLES); //Convert to F32
         arm_biquad_cascade_df1_f32(&bp_inst, f32_buf, block_to_write, BLOCK_SIZE_SAMPLES); // Filter into slab buffer
         cbb_advance_write_index(&_block_buffer); //Advance slab buffer index for next run
-        k_mem_slab_free(audio_in_get_mem_slab(), msg->buffer);
+        //k_mem_slab_free(audio_in_get_mem_slab(), msg->buffer);
 
         // WAV Writing
         // arm_float_to_q15(f32_buf, out_q15, BLOCK_SIZE_SAMPLES); // Convert back to int for saving to file

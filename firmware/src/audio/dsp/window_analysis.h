@@ -4,6 +4,7 @@
 #include <zephyr/kernel.h>
 #include "../../macros.h"
 #include "arm_math.h"
+#include "trend_analysis.h"
 
 typedef enum {
     WINDOW_PEAK_TYPE_UNVAL,
@@ -17,6 +18,7 @@ typedef struct {
     int32_t ste_index;     
     float value;          
     WindowPeakType type;
+    int32_t global_index; 
     int32_t audio_index;   
     float rms;
     float centroid;        
@@ -33,6 +35,15 @@ typedef struct {
     float ident_s1_s2_gap_r; //timing gap between S1 and S2
     float ident_s1_s2_gap_tol; //timing gap tolerance
     uint32_t hs_window_size;
+    //Trend analysis
+    int32_t ta_rms_buf_size;
+    float ta_rms_slope_thresh;
+    int32_t ta_rms_min_windows;
+
+    int32_t ta_centroid_buf_size;
+    float ta_centroid_slope_thresh;
+    int32_t ta_centroid_min_windows;
+
 } WindowAnalysisConfig;
 
 typedef struct {
@@ -50,6 +61,10 @@ typedef struct {
     float scratch_windowed[HS_WINDOW_SIZE];
     float scratch_fft_out[HS_WINDOW_SIZE + 2];
     float scratch_fft_mag[(HS_WINDOW_SIZE / 2) - 1];
+    TrendAnalyser ta_s1_rms;
+    TrendAnalyser ta_s2_rms;
+    TrendAnalyser ta_s1_centroid;
+    TrendAnalyser ta_s2_centroid;
 } WindowAnalysis;
 
 void wa_init(WindowAnalysis *window_analysis, const WindowAnalysisConfig *window_analysis_config);
@@ -73,6 +88,8 @@ void wa_label_S1_S2_by_fraction(WindowAnalysis *wa);
 void wa_assign_audio_peaks(WindowAnalysis *wa);
 
 void wa_extract_peak_features(WindowAnalysis *wa);
+
+void wa_push_trends(WindowAnalysis *wa);
 
 void wa_make_send_ble(WindowAnalysis *wa);
 
