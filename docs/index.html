@@ -35,6 +35,24 @@
       color: #dc3545;
       font-weight: bold;
     }
+
+    #alertFeed {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+
+    .alert-badge {
+      background-color: #dc3545;
+      color: white;
+      padding: 0.3rem 0.7rem;
+      border-radius: 0.5rem;
+      font-weight: bold;
+      white-space: nowrap;
+      user-select: none;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 
@@ -43,15 +61,14 @@
     <div class="card">
       <h2 class="mb-4">Heart Sound Patch Dashboard</h2>
       <div class="mb-3 d-flex align-items-center flex-wrap gap-2">
-        <button class="btn btn-primary" onclick="simulateBeat()">Simulate Beat</button>
-        <button class="btn btn-danger" onclick="toggleAlert()">Toggle Alert</button>
-        <button class="btn btn-success" onclick="connectBLE()">Try Connect</button>
+        <button class="btn btn-success" onclick="connectBLE()">Connect</button>
         <button class="btn btn-warning" onclick="sendControlCommand(0x01)">Record</button>
         <button class="btn btn-info" onclick="downloadWavFromBuffer()">Download</button>
         <span id="bleStatus" class="text-muted ms-2">Not connected</span>
       </div>
 
       <p id="status" class="mb-4 status-idle">Status: Idle</p>
+      <div id="alertFeed" class="mb-4"></div>
 
       <div class="mb-4">
         <h5>RMS</h5>
@@ -77,7 +94,7 @@
 
   </div>
   </div>
-  
+
 
   <script>
     const MAX_POINTS = 50;
@@ -190,47 +207,6 @@
       }
     });
 
-    function simulateBeat() {
-      const now = new Date();
-      const newRMS = Math.floor(Math.random() * 400 + 100); // Simulated RMS
-      const newCentroid = Math.floor(Math.random() * 300 + 200); //Simulated centroid in Hz
-
-      // Update datasets
-      rmsData.push({ x: now, y: newRMS });
-      centroidData.push({ x: now, y: newCentroid });
-
-      if (rmsData.length > MAX_POINTS) rmsData.shift();
-      if (centroidData.length > MAX_POINTS) centroidData.shift();
-
-      const rmsStems = rmsData.flatMap(({ x, y }) => [
-        { x, y: 0 },
-        { x, y },
-        { x: null, y: null }
-      ]);
-
-      const centroidStems = centroidData.flatMap(({ x, y }) => [
-        { x, y: 0 },
-        { x, y },
-        { x: null, y: null }
-      ]);
-
-      rmsChart.data.datasets[0].data = rmsStems;
-      rmsChart.data.datasets[1].data = rmsData;
-      rmsChart.update();
-
-      centroidChart.data.datasets[0].data = centroidStems;
-      centroidChart.data.datasets[1].data = centroidData;
-      centroidChart.update();
-
-      updateStatus(`Simulated RMS: ${newRMS}, Centroid: ${newCentroid} Hz at ${now.toLocaleTimeString()}`, false);
-    }
-
-    let alertOn = false;
-    function toggleAlert() {
-      alertOn = !alertOn;
-      updateStatus(alertOn ? "Alert Active" : "Status: Idle", alertOn);
-    }
-
     function updateStatus(message, isAlert) {
       const status = document.getElementById('status');
       status.innerText = message;
@@ -279,7 +255,7 @@
     const ALERT_CHAR_UUID = '359502d4-f343-48ce-97d9-d78fc37d69ee';
     const AUDIO_CONTROL_CHAR_UUID = 'eee14fee-51ea-47ae-bac1-88d53039e5f0';
     const AUDIO_CHAR_UUID = 'c18d949a-0047-46a0-bf2c-e40d87341949';
- 
+
     async function connectBLE() {
       try {
         updateBLEStatus('Requesting device...');
@@ -357,6 +333,19 @@
       updateStatus(`RMS: ${rms.toFixed(1)}, Centroid: ${centroid.toFixed(1)} Hz`, false);
     }
 
+    function addAlertMessage(msg) {
+      const alertFeed = document.getElementById('alertFeed');
+      const alertItem = document.createElement('div');
+      alertItem.className = 'status-alert mb-2';  // Use your existing alert styling
+      alertItem.innerText = msg;
+      alertFeed.appendChild(alertItem);
+
+      // Auto-remove alert after 10 seconds (optional)
+      setTimeout(() => {
+        alertFeed.removeChild(alertItem);
+      }, 30000);
+    }
+
     function handleAlertNotification(event) {
       const dv = event.target.value;
       const alertCode = dv.getUint8(0);
@@ -370,87 +359,89 @@
         alertMsg = 'Status: Normal';
       }
 
-      updateStatus(alertMsg, alertCode !== 0);
+      addAlertMessage(alertMsg);
+      //updateStatus(alertMsg, alertCode !== 0);  // Update main status line
     }
 
-    if ('serviceWorker' in navigator) {navigator.serviceWorker.register('sw.js')
-    .then(reg => console.log(' Service worker registered'))
-    .catch(err => console.error(' Service worker failed:', err));
-}
-
-  // Update/send command
-  async function sendControlCommand(cmd) {
-    if (!audioControlChar) {
-      console.warn('Audio control characteristic not available');
-      return;
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log(' Service worker registered'))
+        .catch(err => console.error(' Service worker failed:', err));
     }
 
-    try {
-      await audioControlChar.writeValue(Uint8Array.of(cmd));
-      console.log(`Sent control command: 0x${cmd.toString(16)}`);
-    } catch (err) {
-      console.error('Failed to write control command:', err);
-  }
-}
+    // Update/send command
+    async function sendControlCommand(cmd) {
+      if (!audioControlChar) {
+        console.warn('Audio control characteristic not available');
+        return;
+      }
 
-function downloadWavFromBuffer(sampleRate = 16000) {
-  if (waveformBuffer.length === 0) {
-    console.warn('No audio data available.');
-    return;
-  }
+      try {
+        await audioControlChar.writeValue(Uint8Array.of(cmd));
+        console.log(`Sent control command: 0x${cmd.toString(16)}`);
+      } catch (err) {
+        console.error('Failed to write control command:', err);
+      }
+    }
 
-  console.log(`Samples recorded: ${waveformBuffer.length}`);
+    function downloadWavFromBuffer(sampleRate = 16000) {
+      if (waveformBuffer.length === 0) {
+        console.warn('No audio data available.');
+        return;
+      }
 
-  drawWaveform();
+      console.log(`Samples recorded: ${waveformBuffer.length}`);
 
-  const numSamples = waveformBuffer.length;
-  const numChannels = 1;
-  const bytesPerSample = 2;
-  const blockAlign = numChannels * bytesPerSample;
-  const byteRate = sampleRate * blockAlign;
-  const wavDataLength = numSamples * bytesPerSample;
-  const wavHeaderLength = 44;
-  const totalLength = wavHeaderLength + wavDataLength;
+      drawWaveform();
 
-  const buffer = new ArrayBuffer(totalLength);
-  const view = new DataView(buffer);
+      const numSamples = waveformBuffer.length;
+      const numChannels = 1;
+      const bytesPerSample = 2;
+      const blockAlign = numChannels * bytesPerSample;
+      const byteRate = sampleRate * blockAlign;
+      const wavDataLength = numSamples * bytesPerSample;
+      const wavHeaderLength = 44;
+      const totalLength = wavHeaderLength + wavDataLength;
 
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, totalLength - 8, true);
-  writeString(view, 8, 'WAVE');
+      const buffer = new ArrayBuffer(totalLength);
+      const view = new DataView(buffer);
 
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true); 
-  view.setUint16(20, 1, true); 
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, 16, true); 
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, totalLength - 8, true);
+      writeString(view, 8, 'WAVE');
 
-  writeString(view, 36, 'data');
-  view.setUint32(40, wavDataLength, true);
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, 16, true);
 
-  for (let i = 0; i < numSamples; i++) {
-    view.setInt16(44 + i * 2, waveformBuffer[i], true);
-  }
-  const blob = new Blob([buffer], { type: 'audio/wav' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.style.display = 'none';
-  a.href = url;
-  a.download = 'recording.wav';
-  document.body.appendChild(a);
-  a.click();
-  URL.revokeObjectURL(url);
-  document.body.removeChild(a);
-}
+      writeString(view, 36, 'data');
+      view.setUint32(40, wavDataLength, true);
 
-function writeString(view, offset, str) {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(offset + i, str.charCodeAt(i));
-  }
-}
+      for (let i = 0; i < numSamples; i++) {
+        view.setInt16(44 + i * 2, waveformBuffer[i], true);
+      }
+      const blob = new Blob([buffer], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'recording.wav';
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }
+
+    function writeString(view, offset, str) {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    }
 
   </script>
 </body>
