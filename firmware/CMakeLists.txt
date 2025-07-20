@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20.0)
 # Define DT Overlay:
 # Prototype 1: mic_patch_mk1_nrf5340_cpuapp.overlay
 # Prototype 2: mic_patch_mk2_nrf5340_cpuapp.overlay
-set(DTC_OVERLAY_FILE "${CMAKE_CURRENT_SOURCE_DIR}/boards/mic_patch_mk1_nrf5340_cpuapp.overlay")
+#set(DTC_OVERLAY_FILE "${CMAKE_CURRENT_SOURCE_DIR}/boards/mic_patch_mk1_nrf5340_cpuapp.overlay")
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
