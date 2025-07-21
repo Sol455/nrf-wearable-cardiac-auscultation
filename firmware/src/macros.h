@@ -11,7 +11,7 @@
 #define BYTES_PER_SAMPLE 2
 #define NUM_CHANNELS 1
 #define READ_TIMEOUT 1000
-#define WAV_LENGTH_BLOCKS 100
+#define WAV_LENGTH_BLOCKS 200
 
 #define BLOCK_SIZE(_sample_rate, _number_of_channels) \
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
@@ -34,6 +34,8 @@
 #define STE_MAX_BUF_LEN PP_MAX_WINDOW_LEN / STE_SAMPLES_PER_BLOCK
 #define MAX_NUM_WINDOW_PEAKS 64
 #define HS_WINDOW_SIZE 512
+
+#define TREND_ANALYSER_MAX_BUFFER 30
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f

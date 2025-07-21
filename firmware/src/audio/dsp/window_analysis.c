@@ -3,6 +3,7 @@
 #include "window_analysis.h"
 #include "../../ble/heart_service.h"
 
+
 LOG_MODULE_REGISTER(window_analysis);
 
 void _generate_hann_window(float *buf, uint32_t N) {
@@ -32,6 +33,11 @@ void wa_init(WindowAnalysis *window_analysis, const WindowAnalysisConfig *window
     memset(window_analysis->scratch_fft_out, 0, sizeof(window_analysis->scratch_fft_out));
     memset(window_analysis->scratch_fft_mag, 0, sizeof(window_analysis->scratch_fft_mag));
     memset(window_analysis->peaks, 0, sizeof(window_analysis->peaks));
+
+    trend_analyser_init(&window_analysis->ta_s1_rms, window_analysis_config->ta_rms_buf_size, window_analysis_config->ta_rms_slope_thresh, window_analysis_config->ta_rms_min_windows);
+    trend_analyser_init(&window_analysis->ta_s2_rms, window_analysis_config->ta_rms_buf_size, window_analysis_config->ta_rms_slope_thresh, window_analysis_config->ta_rms_min_windows);
+    trend_analyser_init(&window_analysis->ta_s1_centroid, window_analysis_config->ta_centroid_buf_size, window_analysis_config->ta_centroid_slope_thresh, window_analysis_config->ta_centroid_min_windows);
+    trend_analyser_init(&window_analysis->ta_s2_centroid, window_analysis_config->ta_centroid_buf_size, window_analysis_config->ta_centroid_slope_thresh, window_analysis_config->ta_centroid_min_windows);
 }
 
 void wa_set_audio_window(WindowAnalysis *window_analysis, const float *audio_window, int32_t window_len, uint32_t window_start_idx)
@@ -335,7 +341,19 @@ void wa_extract_peak_features(WindowAnalysis *wa)
                 wa->scratch_fft_mag
             );
 
-            LOG_INF("RMS: %f, SPECTRAL CENTROID: %f", wa->peaks[i].rms, wa->peaks[i].centroid);
+            //LOG_INF("RMS: %f, SPECTRAL CENTROID: %f", wa->peaks[i].rms, wa->peaks[i].centroid);
+        }
+    }
+}
+
+void wa_push_trends(WindowAnalysis *wa) {
+
+    for (int32_t i = 0; i < wa->num_peaks; i++) {
+        if (wa->peaks[i].type == WINDOW_PEAK_TYPE_S1) {
+            int32_t absolute_sample_index = wa->window_start_idx + wa->peaks[i].audio_index;
+            float timestamp_s = (float)absolute_sample_index / (float)MAX_SAMPLE_RATE; 
+            trend_analyser_update(&wa->ta_s1_rms, timestamp_s, wa->peaks[i].rms);
+            trend_analyser_update(&wa->ta_s1_centroid, timestamp_s, wa->peaks[i].centroid);
         }
     }
 }
@@ -349,7 +367,27 @@ void wa_make_send_ble(WindowAnalysis *wa) {
             uint32_t absolute_sample_index = wa->window_start_idx + wa->peaks[i].audio_index;
             uint32_t timestamp_ms = (uint32_t)(((float)absolute_sample_index / (float)MAX_SAMPLE_RATE) * 1000.0f);
             packet.timestamp_ms = timestamp_ms;
+
+            float rms_slope, centroid_slope;
+            trend_analyser_get_slope(&wa->ta_s1_rms, &rms_slope);
+            trend_analyser_get_slope(&wa->ta_s1_centroid, &centroid_slope);
+
+            packet.rms_trend = rms_slope;
+            packet.centroid_trend = centroid_slope;
+
             bt_heart_service_notify_packet(&packet);
+
+            if(trend_analyser_is_alert(&wa->ta_s1_rms)) {
+                int ret = bt_heart_service_notify_alert(0x01);
+                if(ret!=0) LOG_ERR("Alert Failed to send");
+                LOG_INF("RMS ALERT");
+            }
+
+            if(trend_analyser_is_alert(&wa->ta_s1_centroid)) {
+                int ret = bt_heart_service_notify_alert(0x02);
+                if(ret!=0) LOG_ERR("Alert Failed to send");
+                LOG_INF("CENTROID ALERT");
+            }
         }
     }
 }

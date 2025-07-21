@@ -87,6 +87,8 @@ void peak_processor_send_function(const float *window, int32_t window_start_idx,
     //8. perform FFT on window and calc RMS
     wa_extract_peak_features(&_window_analyser);
 
+    wa_push_trends(&_window_analyser);
+
     //9. Create heart beat event and publish
     wa_make_send_ble(&_window_analyser);
 
