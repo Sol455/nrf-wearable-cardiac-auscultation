@@ -8,7 +8,7 @@ During operation, the device is affixed to a patient's chest using Tegaderm film
 
 ## Web Dashboard
 
-**[Click here to launch the dashboard](https://sol455.github.io/nrf_auscultation/)**
+**[Click here to launch the dashboard](https://sol455.github.io/nrf-wearable-cardiac-auscultation/)**
 
 
 ## Repository Structure
