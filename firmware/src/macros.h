@@ -11,7 +11,12 @@
 #define BYTES_PER_SAMPLE 2
 #define NUM_CHANNELS 1
 #define READ_TIMEOUT 1000
-#define WAV_LENGTH_BLOCKS 200
+
+#if CONFIG_HEART_PATCH_DSP_MODE
+#define WAV_LENGTH_BLOCKS 200 //Length of capture, 200 = 20s at 16Khz fs
+#else
+#define WAV_LENGTH_BLOCKS 50  //5s for BLE transmission
+#endif
 
 #define BLOCK_SIZE(_sample_rate, _number_of_channels) \
 (BYTES_PER_SAMPLE * (_sample_rate / 10) * _number_of_channels)
